@@ -1,0 +1,35 @@
+# Schedule definitions for thorn Cocal
+
+if (CCTK_Equals(initial_data, "CocalRNS") || (CCTK_Equals(initial_data, "CocalBNS")))
+{
+   #SCHEDULE GROUP coc2cac_dummy AFTER ADMBaseX_PostInitial BEFORE HydroBaseX_Initial AT Initial
+   #{
+#
+   #} "Enforce Hydro after ADM grid variables."
+   SCHEDULE coc2cac_main IN HydroBaseX_InitialData AFTER HydroBaseX_initial_data
+   {
+      LANG: FORTRAN
+      WRITES: HydroBaseX::rho(everywhere) HydroBaseX::press(everywhere) HydroBaseX::eps(everywhere) HydroBaseX::vel(everywhere)
+      WRITES: ADMBaseX::metric(everywhere) ADMBaseX::curv(everywhere) ADMBaseX::lapse(everywhere) ADMBaseX::shift(everywhere)
+   }"Read Cocal Initial Data into Cactus"
+   if (CCTK_Equals(initial_data, "CocalRNS"))
+      SCHEDULE coc2cac_deallocate_rns AT POSTPOSTINITIAL
+      {
+         LANG: FORTRAN
+         options: global
+      } "deallocate all COCAL rns data"
+   if (CCTK_Equals(initial_data, "CocalBNS"))
+      SCHEDULE coc2cac_deallocate_bns AT POSTPOSTINITIAL
+      {
+         LANG: FORTRAN
+         options: global
+      } "deallocate all COCAL bns data"
+}
+
+#if (CCTK_Equals(initial_data, "Exact") && CCTK_Equals(coc2cac_rnstype,"BHT_WL"))
+#{
+#   SCHEDULE coc2cac_main in ADMBaseX_InitialData AFTER Exact__initialize BEFORE HydroBaseX_Initial
+#   {
+#      LANG: FORTRAN
+#   }"Read Exact BHT Initial Data into Exact Kerr-Schild Data."
+#}

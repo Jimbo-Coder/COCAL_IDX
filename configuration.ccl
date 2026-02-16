@@ -1,0 +1,8 @@
+# Configuration definitions for thorn Cocal
+
+REQUIRES Fortran
+
+PROVIDES Cocal
+{
+  
+}
