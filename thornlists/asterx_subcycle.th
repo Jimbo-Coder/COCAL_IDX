@@ -309,6 +309,18 @@ AsterX/AsterAnalysis
 !CHECKOUT =
 BNSTools/MHD_Diagnostics
 BNSTools/VolumeIntegrals_GRMHDX
+BNSTools/VolumeIntegrals_vacuumX
+BNSTools/Outflow
+
+#Allen QLM_X 
+!TARGET   = $ARR
+!TYPE     = git
+!URL      = https://github.com/Jimbo-Coder/SpacetimeX.git
+!REPO_PATH= $2
+!REPO_BRANCH=qlm_dev
+!NAME     = SpacetimeX_qlm
+!CHECKOUT =
+SpacetimeX/QuasiLocalMeasures
 
 #Cocal_IDX
 !TARGET   = $ARR

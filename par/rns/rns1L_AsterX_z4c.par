@@ -28,7 +28,8 @@ Subcycling
 #SystemTopology
 TimerReport
 TmunuBaseX
-#VolumeIntegrals_GRMHDX
+VolumeIntegrals_GRMHDX
+VolumeIntegrals_vacuumX
 Z4c
 "
 
@@ -147,7 +148,7 @@ Z4c::boundary_conditions = "NewRadX"
 AsterSeeds::test_type = "3DTest"
 AsterSeeds::test_case = "magTOV"
 AsterSeeds::Afield_config = "internal dipole"
-AsterSeeds::Ab = 100.0
+AsterSeeds::Ab = 0.0
 AsterSeeds::press_cut = 0.04
 AsterSeeds::press_max =  7.7855755426457722e-05
 AsterSeeds::Avec_kappa = 2.0
@@ -179,7 +180,7 @@ Con2PrimFactory::max_iter = 1000
 Con2PrimFactory::B_lim = 1e8
 Con2PrimFactory::vw_lim = 1e8
 Con2PrimFactory::Ye_lenient = "yes"
-Con2PrimFactory::cons_error_limit = -1
+#Con2PrimFactory::cons_error_limit = -1
 Con2PrimFactory::use_temperature = "no"
 #atmosphere for Ideal gas EOS
 Con2PrimFactory::thermal_eos_atmo = "no"
@@ -210,9 +211,9 @@ CarpetX::out_silo_vars = "
     HydroBaseX::press
     HydroBaseX::Bvec
     #AsterAnalysis::mhd_analysis
-    #ADMBaseX::lapse
-    #ADMBaseX::shift
-    #ADMBaseX::metric
+    ADMBaseX::lapse
+    ADMBaseX::shift
+    ADMBaseX::metric
     #Z4c::allC
     Z4c::HC
     #Z4c::MtC
@@ -268,27 +269,30 @@ CarpetX::checkpoint_method = "openpmd"
 CarpetX::recover_method    = "openpmd"
 
 
-## Set number of integrals
-#VolumeIntegrals_GRMHDX::NumIntegrals = 1
+# Set number of integrals
+VolumeIntegrals_GRMHDX::NumIntegrals = 2
+# Set frequency of integration. If tracking AMR centres this should
+# match the regridding frequency of the thorn CactusRegrid2
+VolumeIntegrals_GRMHDX::VolIntegral_out_every = $out_every
+# Enable file output
+VolumeIntegrals_GRMHDX::enable_file_output = 1
+# Set output directory
+VolumeIntegrals_GRMHDX::outVolIntegral_dir = "volume_integration"
+# Set verbose level. 0 disables it, 1 provides useful
+# information, and 2 is very verbose.
+VolumeIntegrals_GRMHDX::verbose = 2
+VolumeIntegrals_GRMHDX::set_origin_with_VIX = "yes"
+
+# The AMR centre will only track the first referenced
+# integration quantities that track said centre.
+# Integral #1: rest mass
+VolumeIntegrals_GRMHDX::Integration_quantity_keyword[1] = "centerofmass"
+VolumeIntegrals_GRMHDX::Integration_quantity_keyword[2] = "restmass"
 #
-## Set frequency of integration. If tracking AMR centres this should
-## match the regridding frequency of the thorn CactusRegrid2
-#VolumeIntegrals_GRMHDX::VolIntegral_out_every = $out_every
-#
-## Enable file output
-#VolumeIntegrals_GRMHDX::enable_file_output = 0
-#
-## Set output directory
-#VolumeIntegrals_GRMHDX::outVolIntegral_dir = "volume_integration"
-#
-## Set verbose level. 0 disables it, 1 provides useful
-## information, and 2 is very verbose.
-#VolumeIntegrals_GRMHDX::verbose = 2
-#
-## The AMR centre will only track the first referenced
-## integration quantities that track said centre.
-#
-#
-## Integral #1: rest mass
-#VolumeIntegrals_GRMHDX::Integration_quantity_keyword[1] = "restmass"
-#
+
+VolumeIntegrals_vacuumX::HamiltonianVarString  = "Z4c::HC"
+VolumeIntegrals_vacuumX::Momentum0VarString    = "Z4c::MtCx"
+VolumeIntegrals_vacuumX::Momentum1VarString    = "Z4c::MtCy"
+VolumeIntegrals_vacuumX::Momentum2VarString    = "Z4c::MtCz"
+
+VolumeIntegrals_vacuumX::enable_file_output    = 1
