@@ -2,13 +2,13 @@
 
 $itlast = 128000
 $final_time = 1000
-$xmin = -512.0
-$xmax = +512.0
-$ncells = 160
-$nlevels = 6
+$xmin = -64.25 #-512.0
+$xmax =  63.75 #+512.0
+$ncells = 256
+$nlevels = 1 #6
 $error_threshold = 0.9
 $dtfac = 0.25
-$out_every = 16
+$out_every = 64
 
 ActiveThorns = "
 ADMBaseX
@@ -31,6 +31,9 @@ TmunuBaseX
 VolumeIntegrals_GRMHDX
 VolumeIntegrals_vacuumX
 Z4c
+#SphericalSurface
+#QuasiLocalMeasures
+#Outflow
 "
 
 Cactus::cctk_show_schedule = yes
@@ -56,17 +59,17 @@ CarpetX::ncells_x = $ncells
 CarpetX::ncells_y = $ncells
 CarpetX::ncells_z = $ncells
 
-#CarpetX::max_tile_size_x = 1024000
-#CarpetX::max_tile_size_y = 1024000
-#CarpetX::max_tile_size_z = 1024000
+CarpetX::max_tile_size_x = 1024000
+CarpetX::max_tile_size_y = 1024000
+CarpetX::max_tile_size_z = 1024000
 
 #CarpetX::blocking_factor_x = 1
 #CarpetX::blocking_factor_y = 1
 #CarpetX::blocking_factor_z = 1
 
-CarpetX::max_grid_size_x = 32
-CarpetX::max_grid_size_y = 32 
-CarpetX::max_grid_size_z = 32
+CarpetX::max_grid_size_x = 64
+CarpetX::max_grid_size_y = 64
+CarpetX::max_grid_size_z = 128
 
 #CarpetX::max_grid_sizes_x = [  64,   64,   64 ]
 #CarpetX::max_grid_sizes_y = [  32,   32,   32 ]
@@ -87,13 +90,13 @@ CarpetX::regrid_error_threshold = $error_threshold
 CarpetX::out_performance_every = 1024
 
 CarpetX::refine_grid_layout = no
-
+#CarpetX::gpu_sync_after_every_kernel = yes
 #Initial data
-#RNS WL 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24/work_area_RNS
-#RNS CF 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_CF_M1.4_par_sol_24/work_area_RNS
-cocal_IDX::coc2cac_dir_path_ID = "/work2/09499/maxrizzo/frontera/coc2cac_IDs/rns/rnsH3_K123.6_CF_M1.4_par_sol_24/work_area_RNS"
+#RNS WL 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24 radius about 13
+#RNS CF 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_CF_M1.4_par_sol_24
+cocal_IDX::coc2cac_dir_path_ID = "/projects/bgmi/mrizzo/COCAL_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24"
 cocal_IDX::coc2cac_readpot = "False"
-cocal_IDX::coc2cac_rnstype         = "RNS_CF"
+cocal_IDX::coc2cac_rnstype         = "RNS_WL"
 
 cocal_IDX::coc2cac_cen_x1 =  0.0
 
@@ -110,9 +113,10 @@ BoxInBox::num_regions = 1
 
 # Region 1
 BoxInBox::shape_1 = "cube"
-BoxInBox::num_levels_1 = 6
+BoxInBox::num_levels_1 = $nlevels
 BoxInBox::position_x_1 = 0.0
-BoxInBox::radius_1 = [-1, 256, 128, 64, 32, 16]
+#BoxInBox::radius_1 = [-1, 256, 128, 64, 32, 16]
+BoxInBox::radius_1 = [-1]
 #dx = 6.4, 3.2, 1.6, 0.8, 0.4, 0.2, 0.1
 
 CarpetX::prolongation_type = "poly-cons3lfb"
@@ -198,26 +202,26 @@ EOSX::eps_max = 1e8
 EOSX::eps_min = 1.236e-09 
 
 IO::out_dir = $parfile
-IO::out_every = $out_every
+IO::out_every = $out_every #
 CarpetX::out_norm_vars = "all"
 CarpetX::out_norm_omit_unstable = yes
 CarpetX::out_norm_every = $out_every
-CarpetX::out_silo_compression_options = "METHOD=GZIP"
+#CarpetX::out_silo_compression_options = "METHOD=GZIP"
 
-CarpetX::out_silo_vars = "
-    HydroBaseX::rho
-    #HydroBaseX::vel
-    #HydroBaseX::eps
-    HydroBaseX::press
-    HydroBaseX::Bvec
-    #AsterAnalysis::mhd_analysis
-    ADMBaseX::lapse
-    ADMBaseX::shift
-    ADMBaseX::metric
-    #Z4c::allC
-    Z4c::HC
-    #Z4c::MtC
-"
+#CarpetX::out_silo_vars = "
+#    HydroBaseX::rho
+#    #HydroBaseX::vel
+#    #HydroBaseX::eps
+#    HydroBaseX::press
+#    HydroBaseX::Bvec
+#    #AsterAnalysis::mhd_analysis
+#    ADMBaseX::lapse
+#    ADMBaseX::shift
+#    ADMBaseX::metric
+#    #Z4c::allC
+#    Z4c::HC
+#    Z4c::MtC
+#"
 
 CarpetX::out_openpmd_vars = "
     HydroBaseX::rho
@@ -227,24 +231,31 @@ CarpetX::out_openpmd_vars = "
     HydroBaseX::Bvec
     #Z4c::allC
     Z4c::HC
-    #Z4c::MtC
+    Z4c::MtC
+    VolumeIntegrals_vacuumX::MADM_GFtest
 "
 
 CarpetX::out_tsv_vars = "
-    AsterX::dB
-    HydroBaseX::Bvec
-    HydroBaseX::rho
-    HydroBaseX::vel
-    HydroBaseX::press
-    ADMBaseX::lapse
-    ADMBaseX::shift
-    ADMBaseX::metric
-    #TmunuBaseX::eTtt
-    #TmunuBaseX::eTti
-    #TmunuBaseX::eTij
-    #Z4c::allC
-    Z4c::HC
-    Z4c::MtC
+#    AsterX::dB
+#    HydroBaseX::Bvec
+#    HydroBaseX::rho
+#    HydroBaseX::vel
+#    HydroBaseX::press
+#    ADMBaseX::lapse
+#    ADMBaseX::shift
+#    ADMBaseX::metric
+#    #TmunuBaseX::eTtt
+#    #TmunuBaseX::eTti
+#    #TmunuBaseX::eTij
+#    #Z4c::allC
+#    Z4c::HC
+#    Z4c::MtC
+#    SphericalSurface::sf_info
+#    SphericalSurface::sf_origin
+#    SphericalSurface::sf_valid
+#    QuasiLocalMeasures::qlm_grid_real
+#    QuasiLocalMeasures::qlm_scalars
+  VolumeIntegrals_vacuumX::MADM_GFtest
 "
 
 CarpetX::out_metadata = no
@@ -273,7 +284,7 @@ CarpetX::recover_method    = "openpmd"
 VolumeIntegrals_GRMHDX::NumIntegrals = 2
 # Set frequency of integration. If tracking AMR centres this should
 # match the regridding frequency of the thorn CactusRegrid2
-VolumeIntegrals_GRMHDX::VolIntegral_out_every = $out_every
+VolumeIntegrals_GRMHDX::VolIntegral_out_every = 1 #$out_every
 # Enable file output
 VolumeIntegrals_GRMHDX::enable_file_output = 1
 # Set output directory
@@ -296,3 +307,47 @@ VolumeIntegrals_vacuumX::Momentum1VarString    = "Z4c::MtCy"
 VolumeIntegrals_vacuumX::Momentum2VarString    = "Z4c::MtCz"
 
 VolumeIntegrals_vacuumX::enable_file_output    = 1
+
+VolumeIntegrals_vacuumX::outVolIntegral_dir    = "volume_integration"
+VolumeIntegrals_vacuumX::VolIntegral_out_every = 1 #$out_every
+VolumeIntegrals_vacuumX::NumIntegrals          = 5
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[1] = "H_M_CnstraintsL2"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[2] = "H_M2_CnstraintsL2"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[3] = "ADM_Mass"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[4] = "ADM_Momentum"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[5] = "ADM_Angular_Momentum"
+
+
+
+#SphericalSurface::nsurfaces = 5
+#SphericalSurface::name[0] = "r = 5.0"
+#SphericalSurface::name[1] = "r = 15.0"
+#SphericalSurface::name[2] = "r = 50.0"
+#SphericalSurface::name[3] = "r = 250.0"
+#SphericalSurface::name[4] = "r = 500.0"
+#
+#SphericalSurface::maxntheta = 19
+#SphericalSurface::maxnphi = 40
+#
+#SphericalSurface::ntheta[0] = 19
+#SphericalSurface::ntheta[1] = 19
+#SphericalSurface::ntheta[2] = 19
+#SphericalSurface::ntheta[3] = 19
+#SphericalSurface::ntheta[4] = 19
+#
+#SphericalSurface::nphi[0] = 40
+#SphericalSurface::nphi[1] = 40
+#SphericalSurface::nphi[2] = 40
+#SphericalSurface::nphi[3] = 40
+#SphericalSurface::nphi[4] = 40
+#
+#QuasiLocalMeasures::num_surfaces = SphericalSurface::nsurfaces
+#QuasiLocalMeasures::surface_index = [ 0, 1, 2, 3, 4 ]
+#QuasiLocalMeasures::surface_name = [ "r = 5.0", "r = 15.0", "r = 50.0", "r = 250.0", "r = 500.0" ]
+
+#Outflow::compute_every = $out_every
+#Outflow::num_detectors = SphericalSurface::nsurfaces
+#Outflow::surface_index = [ 0, 1, 2, 3, 4 ]
+#Outflow::surface_name = [ "r = 5.0", "r = 15.0", "r = 50.0", "r = 250.0", "r = 500.0" ]
+
+
