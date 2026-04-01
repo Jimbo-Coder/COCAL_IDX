@@ -225,10 +225,14 @@ CarpetX::out_norm_every = $out_every
 
 CarpetX::out_openpmd_vars = "
     HydroBaseX::rho
-    #HydroBaseX::vel
-    #HydroBaseX::eps
+    HydroBaseX::vel
+    HydroBaseX::eps
     HydroBaseX::press
     HydroBaseX::Bvec
+    ADMBaseX::lapse
+    ADMBaseX::shift
+    ADMBaseX::metric
+    ADMBaseX::curv
     #Z4c::allC
     Z4c::HC
     Z4c::MtC
@@ -237,13 +241,15 @@ CarpetX::out_openpmd_vars = "
 
 CarpetX::out_tsv_vars = "
 #    AsterX::dB
-#    HydroBaseX::Bvec
-#    HydroBaseX::rho
-#    HydroBaseX::vel
-#    HydroBaseX::press
-#    ADMBaseX::lapse
-#    ADMBaseX::shift
-#    ADMBaseX::metric
+     HydroBaseX::rho
+     HydroBaseX::vel
+     HydroBaseX::eps
+     HydroBaseX::Bvec
+     HydroBaseX::press
+     ADMBaseX::lapse
+     ADMBaseX::shift
+     ADMBaseX::metric
+     ADMBaseX::curv
 #    #TmunuBaseX::eTtt
 #    #TmunuBaseX::eTti
 #    #TmunuBaseX::eTij
@@ -281,7 +287,7 @@ CarpetX::recover_method    = "openpmd"
 
 
 # Set number of integrals
-VolumeIntegrals_GRMHDX::NumIntegrals = 2
+VolumeIntegrals_GRMHDX::NumIntegrals = 3
 # Set frequency of integration. If tracking AMR centres this should
 # match the regridding frequency of the thorn CactusRegrid2
 VolumeIntegrals_GRMHDX::VolIntegral_out_every = 1 #$out_every
@@ -299,6 +305,7 @@ VolumeIntegrals_GRMHDX::set_origin_with_VIX = "yes"
 # Integral #1: rest mass
 VolumeIntegrals_GRMHDX::Integration_quantity_keyword[1] = "centerofmass"
 VolumeIntegrals_GRMHDX::Integration_quantity_keyword[2] = "restmass"
+VolumeIntegrals_GRMHDX::Integration_quantity_keyword[3] = "one"
 #
 
 VolumeIntegrals_vacuumX::HamiltonianVarString  = "Z4c::HC"
@@ -310,12 +317,13 @@ VolumeIntegrals_vacuumX::enable_file_output    = 1
 
 VolumeIntegrals_vacuumX::outVolIntegral_dir    = "volume_integration"
 VolumeIntegrals_vacuumX::VolIntegral_out_every = 1 #$out_every
-VolumeIntegrals_vacuumX::NumIntegrals          = 5
+VolumeIntegrals_vacuumX::NumIntegrals          = 6
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[1] = "H_M_CnstraintsL2"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[2] = "H_M2_CnstraintsL2"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[3] = "ADM_Mass"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[4] = "ADM_Momentum"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[5] = "ADM_Angular_Momentum"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[6] = "one"
 
 
 

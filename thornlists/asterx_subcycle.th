@@ -172,10 +172,10 @@ ExternalLibraries/yaml_cpp
 ExternalLibraries/ssht
 
 
-# Boost library
+# Boost library (updated)
 !TARGET   = $ARR
 !TYPE     = git                                                                                         
-!URL      = https://github.com/dradice/Boost.git
+!URL      = https://github.com/Jimbo-Coder/Boost.git
 !REPO_PATH = ../$2                                                                                      
 !CHECKOUT =
 ExternalLibraries/Boost
@@ -300,33 +300,18 @@ AsterX/AsterAnalysis
 #nuX/nuX_Rates
 #nuX/nuX_FakeRates
 
-#AsterX Fixes
-!TARGET   = $ARR
-!TYPE     = git
-!URL      = https://github.com/Jimbo-Coder/BNSTools.git
-!REPO_PATH= $2
-!REPO_BRANCH=development
-!CHECKOUT =
+
+# private thorns
+#!TARGET = $ARR
+#!TYPE   = ignore
+#!CHECKOUT = 
+COCALX/COCAL_IDX
+
 BNSTools/MHD_Diagnostics
 BNSTools/VolumeIntegrals_GRMHDX
 BNSTools/VolumeIntegrals_vacuumX
 BNSTools/Outflow
 
-#Allen QLM_X 
-!TARGET   = $ARR
-!TYPE     = git
-!URL      = https://github.com/Jimbo-Coder/SpacetimeX.git
-!REPO_PATH= $2
-!REPO_BRANCH=qlm_dev
-!NAME     = SpacetimeX_qlm
-!CHECKOUT =
-SpacetimeX/QuasiLocalMeasures
-
-#Cocal_IDX
-!TARGET   = $ARR
-!TYPE     = git
-!URL      = https://github.com/Jimbo-Coder/COCAL_IDX.git
-!REPO_PATH= $2
-!REPO_BRANCH=main
-!CHECKOUT =
-COCALX2/COCAL_IDX
+SpacetimeX_qlm/SphericalSurface
+SpacetimeX_qlm/QuasiLocalMeasures
+SpacetimeX_qlm/TGRtensor
