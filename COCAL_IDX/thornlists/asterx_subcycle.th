@@ -310,8 +310,8 @@ COCALX/COCAL_IDX
 BNSTools/MHD_Diagnostics
 BNSTools/VolumeIntegrals_GRMHDX
 BNSTools/VolumeIntegrals_vacuumX
-BNSTools/Outflow
 
+#BNSTools/Outflow
 SpacetimeX_qlm/SphericalSurface
 SpacetimeX_qlm/QuasiLocalMeasures
 SpacetimeX_qlm/TGRtensor
