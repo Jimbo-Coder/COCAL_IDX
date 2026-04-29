@@ -4,7 +4,7 @@ $itlast = 128000
 $final_time = 1000
 $xmin = -256 #-512.0
 $xmax = 256 #+512.0
-$ncells = 32
+$ncells = 64
 $nlevels = 5
 $error_threshold = 0.9
 $dtfac = 0.25
@@ -96,7 +96,7 @@ CarpetX::refine_grid_layout = no
 #Initial data
 #RNS WL 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24 radius about 13
 #RNS CF 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_CF_M1.4_par_sol_24
-cocal_IDX::coc2cac_dir_path_ID = "/home/nickd/cocal_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24"
+cocal_IDX::coc2cac_dir_path_ID = "/projects/bgmi/mrizzo/COCAL_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24"
 cocal_IDX::coc2cac_readpot = "False"
 cocal_IDX::coc2cac_rnstype         = "RNS_WL"
 
@@ -207,13 +207,13 @@ IO::out_dir = $parfile
 IO::out_every = $out_every #
 CarpetX::out_norm_vars = "all"
 CarpetX::out_norm_omit_unstable = yes
-CarpetX::out_norm_every = 16
+CarpetX::out_norm_every = $out_every
 #CarpetX::out_silo_compression_options = "METHOD=GZIP"
 
 #CarpetX::out_silo_vars = "
 #    HydroBaseX::rho
-#    #HydroBaseX::vel
-#    #HydroBaseX::eps
+#    HydroBaseX::vel
+#    HydroBaseX::eps
 #    HydroBaseX::press
 #    HydroBaseX::Bvec
 #    #AsterAnalysis::mhd_analysis
@@ -241,7 +241,7 @@ CarpetX::out_openpmd_vars = "
 #    VolumeIntegrals_vacuumX::MADM_GFtest
 "
 
-CarpetX::out_tsv_every = 16
+CarpetX::out_tsv_every = $out_every
 CarpetX::out_tsv_vars = "
 #    AsterX::dB
      HydroBaseX::rho
@@ -322,15 +322,16 @@ VolumeIntegrals_vacuumX::enable_file_output    = 1
 
 VolumeIntegrals_vacuumX::outVolIntegral_dir    = "volume_integration"
 VolumeIntegrals_vacuumX::VolIntegral_out_every = $out_every
-VolumeIntegrals_vacuumX::NumIntegrals          = 6
+VolumeIntegrals_vacuumX::NumIntegrals          = 7
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[1] = "H_M_CnstraintsL2"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[2] = "H_M2_CnstraintsL2"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[3] = "ADM_Mass"
-VolumeIntegrals_vacuumX::Integration_quantity_keyword[4] = "ADM_Momentum"
-VolumeIntegrals_vacuumX::Integration_quantity_keyword[5] = "ADM_Angular_Momentum"
-VolumeIntegrals_vacuumX::Integration_quantity_keyword[6] = "one"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[4] = "ADM_Mass"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[5] = "ADM_Momentum"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[6] = "ADM_Angular_Momentum"
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[7] = "one"
 
-VolumeIntegrals_vacuumX::volintegral_inside_sphere__radius[3] = 0.95*$xmax
+VolumeIntegrals_vacuumX::volintegral_inside_sphere__radius[4] = 0.95*$xmax
 
 
 

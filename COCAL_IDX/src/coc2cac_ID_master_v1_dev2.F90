@@ -398,6 +398,13 @@ subroutine coc2cac_deallocate_rns(CCTK_ARGUMENTS)
      DECLARE_CCTK_FUNCTIONS
      DECLARE_CCTK_PARAMETERS
 
+     if (.not. have_read_data) then
+        if (verbose == 1) then 
+           call CCTK_INFO("No data read, skipping deallocation...")
+        end if
+        return
+     end if
+
      if (verbose == 1) then 
         call CCTK_INFO("Deallocating...")
      end if
@@ -436,6 +443,13 @@ subroutine coc2cac_deallocate_bns(CCTK_ARGUMENTS)
    DECLARE_CCTK_ARGUMENTS
    DECLARE_CCTK_FUNCTIONS
    DECLARE_CCTK_PARAMETERS
+   
+   if (.not. have_read_data) then
+      if (verbose == 1) then 
+         call CCTK_INFO("No data read, skipping deallocation...")
+      end if
+      return
+   end if
 
    if (verbose == 1) then 
       call CCTK_INFO("Deallocating...")
