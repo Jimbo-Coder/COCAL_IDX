@@ -6,6 +6,12 @@ if (CCTK_Equals(initial_data, "CocalRNS") || (CCTK_Equals(initial_data, "CocalBN
    #{
 #
    #} "Enforce Hydro after ADM grid variables."
+   if (CCTK_Equals(initial_data, "CocalRNS"))
+      SCHEDULE coc2cac_read_rns_data IN HydroBaseX_InitialData BEFORE coc2cac_main
+      {
+         LANG: FORTRAN
+         options: global
+      } "read COCAL RNS data once per MPI rank"
    SCHEDULE coc2cac_main IN HydroBaseX_InitialData AFTER HydroBaseX_initial_data
    {
       LANG: FORTRAN
@@ -13,13 +19,13 @@ if (CCTK_Equals(initial_data, "CocalRNS") || (CCTK_Equals(initial_data, "CocalBN
       WRITES: ADMBaseX::metric(everywhere) ADMBaseX::curv(everywhere) ADMBaseX::lapse(everywhere) ADMBaseX::shift(everywhere)
    }"Read Cocal Initial Data into Cactus"
    if (CCTK_Equals(initial_data, "CocalRNS"))
-      SCHEDULE coc2cac_deallocate_rns AT POSTPOSTINITIAL
+      SCHEDULE coc2cac_deallocate_rns AT CPINITIAL
       {
          LANG: FORTRAN
          options: global
       } "deallocate all COCAL rns data"
    if (CCTK_Equals(initial_data, "CocalBNS"))
-      SCHEDULE coc2cac_deallocate_bns AT POSTPOSTINITIAL
+      SCHEDULE coc2cac_deallocate_bns AT CPINITIAL
       {
          LANG: FORTRAN
          options: global

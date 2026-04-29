@@ -234,6 +234,197 @@ module cocal_data_bns
    logical, save :: have_read_data = .false.
  end module cocal_data_bns
 
+subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
+  use grid_parameter, eps_cocal => eps
+  use coordinate_grav_r
+  use coordinate_grav_phi
+  use coordinate_grav_theta
+  use coordinate_grav_extended
+  use trigonometry_grav_theta
+  use trigonometry_grav_phi
+  use interface_IO_input_CF_grav_export
+  use interface_IO_input_WL_grav_export_hij
+  use interface_IO_input_grav_export_Kij
+  use interface_IO_input_CF_star_export
+  use interface_invhij_WL_export
+  use interface_index_vec_down2up_export
+  use interface_interpo_gr2fl_metric_CF_export
+  use interface_IO_input_matter_BHT_export
+  use interface_IO_input_grav_export_Ai
+  use interface_IO_input_grav_export_Faraday
+  use interface_IO_input_star4ve_export
+  use cocal_data_rns
+
+  implicit none
+
+  DECLARE_CCTK_ARGUMENTS
+  DECLARE_CCTK_FUNCTIONS
+  DECLARE_CCTK_PARAMETERS
+
+  character*400 :: dir_path, outstr, coc2cac_readformatf
+  integer :: dir_path_len, coc2cac_readformatlen
+
+  call CCTK_FortranString(dir_path_len,coc2cac_dir_path_ID,dir_path)
+  call CCTK_FortranString(coc2cac_readformatlen,coc2cac_readformat,coc2cac_readformatf)
+
+  ! Read and construct shared COCAL data exactly once per MPI rank.
+  ! coc2cac_rns then only consumes these arrays while iterating tiles/levels.
+  !$OMP critical(coc2cac_rns_read)
+  if (.not. have_read_data) then
+     if (verbose == 1) then
+        call CCTK_INFO("Reading COCAL RNS data once for this MPI rank...")
+        call CCTK_INFO("Reading format: " // coc2cac_readformatf)
+        call CCTK_INFO("Cocal: Reading parameters...")
+     end if
+     ! -- Read parameters and build COCAL grids
+     call read_parameter_cactus(dir_path)
+     call peos_initialize_cactus(dir_path)
+     if (CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
+        call read_bht_parameter_cactus(dir_path)
+        call calc_bht_excision_radius
+        call grid_r_bht('eBH')
+        rexc = rg(0)
+        write(outstr,'(F4.2)') rexc
+        if (verbose == 1) then
+           call CCTK_INFO("Excision at r="//outstr)
+        end if
+     else
+        call grid_r
+     end if
+     call grid_theta
+     call trig_grav_theta
+     call grid_phi
+     call allocate_trig_grav_mphi
+     call trig_grav_phi
+     call grid_extended
+
+     if (verbose == 1) then
+        call CCTK_INFO("Cocal: Allocating saved RNS arrays...")
+        write(outstr,'(6i5)') nrg, ntg, npg, nrf, ntf, npf
+        call CCTK_INFO("Cocal Grav grid, Fluid Grid Sizes: "//outstr)
+     end if
+
+     ! -- Allocate and initialize saved arrays
+     allocate ( psif(0:nrf,0:ntf,0:npf))
+     allocate (alphf(0:nrf,0:ntf,0:npf))
+     allocate (bvxuf(0:nrf,0:ntf,0:npf))
+     allocate (bvyuf(0:nrf,0:ntf,0:npf))
+     allocate (bvzuf(0:nrf,0:ntf,0:npf))
+     allocate ( bvxu(0:nrg,0:ntg,0:npg))
+     allocate ( bvyu(0:nrg,0:ntg,0:npg))
+     allocate ( bvzu(0:nrg,0:ntg,0:npg))
+     allocate ( hxxu(0:nrg,0:ntg,0:npg))
+     allocate ( hxyu(0:nrg,0:ntg,0:npg))
+     allocate ( hxzu(0:nrg,0:ntg,0:npg))
+     allocate ( hyyu(0:nrg,0:ntg,0:npg))
+     allocate ( hyzu(0:nrg,0:ntg,0:npg))
+     allocate ( hzzu(0:nrg,0:ntg,0:npg))
+
+     psif=0.0d0; alphf=0.0d0; bvxuf=0.0d0; bvyuf=0.0d0; bvzuf=0.0d0
+     bvxu=0.0d0; bvyu=0.0d0; bvzu=0.0d0
+     hxxu=0.0d0; hxyu=0.0d0; hxzu=0.0d0; hyyu=0.0d0; hyzu=0.0d0; hzzu=0.0d0
+
+     allocate (  psi(0:nrg,0:ntg,0:npg))
+     allocate ( alph(0:nrg,0:ntg,0:npg))
+     allocate ( bvxd(0:nrg,0:ntg,0:npg))
+     allocate ( bvyd(0:nrg,0:ntg,0:npg))
+     allocate ( bvzd(0:nrg,0:ntg,0:npg))
+     psi=0.0d0; alph=0.0d0; bvxd=0.0d0; bvyd=0.0d0; bvzd=0.0d0
+
+     allocate (rs(0:ntf,0:npf))
+     if (.not. CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
+        allocate (emd(0:nrf,0:ntf,0:npf))
+        allocate (omef(0:nrf,0:ntf,0:npf))
+     else
+        allocate (emd(0:nrg,0:ntg,0:npg))
+        allocate (omef(0:nrg,0:ntg,0:npg))
+     end if
+     emd=0.0d0; rs=0.0d0; omef=0.0d0
+
+     allocate ( kxxa(0:nrg,0:ntg,0:npg))
+     allocate ( kxya(0:nrg,0:ntg,0:npg))
+     allocate ( kxza(0:nrg,0:ntg,0:npg))
+     allocate ( kyya(0:nrg,0:ntg,0:npg))
+     allocate ( kyza(0:nrg,0:ntg,0:npg))
+     allocate ( kzza(0:nrg,0:ntg,0:npg))
+     kxxa=0.0d0; kxya=0.0d0; kxza=0.0d0; kyya=0.0d0; kyza=0.0d0; kzza=0.0d0
+
+     allocate ( hxxd(0:nrg,0:ntg,0:npg))
+     allocate ( hxyd(0:nrg,0:ntg,0:npg))
+     allocate ( hxzd(0:nrg,0:ntg,0:npg))
+     allocate ( hyyd(0:nrg,0:ntg,0:npg))
+     allocate ( hyzd(0:nrg,0:ntg,0:npg))
+     allocate ( hzzd(0:nrg,0:ntg,0:npg))
+     hxxd=0.0d0; hxyd=0.0d0; hxzd=0.0d0; hyyd=0.0d0; hyzd=0.0d0; hzzd=0.0d0
+
+     if (CCTK_EQUALS(coc2cac_rnstype,"MRNS_WL")) then
+        allocate (utf(0:nrf,0:ntf,0:npf))
+        allocate (uxf(0:nrf,0:ntf,0:npf))
+        allocate (uyf(0:nrf,0:ntf,0:npf))
+        allocate (uzf(0:nrf,0:ntf,0:npf))
+        utf=0.0d0; uxf=0.0d0; uyf=0.0d0; uzf=0.0d0
+        if (coc2cac_readpot == 1) then
+           allocate (va(0:nrg,0:ntg,0:npg))
+           allocate (vaxd(0:nrg,0:ntg,0:npg))
+           allocate (vayd(0:nrg,0:ntg,0:npg))
+           allocate (vazd(0:nrg,0:ntg,0:npg))
+           va=0.0d0; vaxd=0.0d0; vayd=0.0d0; vazd=0.0d0
+        else if (coc2cac_readpot == 0) then
+           ! Faraday tensor
+           allocate (fxd(0:nrg,0:ntg,0:npg))
+           allocate (fyd(0:nrg,0:ntg,0:npg))
+           allocate (fzd(0:nrg,0:ntg,0:npg))
+           allocate (fxyd(0:nrg,0:ntg,0:npg))
+           allocate (fxzd(0:nrg,0:ntg,0:npg))
+           allocate (fyzd(0:nrg,0:ntg,0:npg))
+           fxd=0.0d0; fyd=0.0d0; fzd=0.0d0; fxyd=0.0d0; fxzd=0.0d0; fyzd=0.0d0
+        end if
+     end if
+
+     ! -- Read COCAL data files
+     call IO_input_CF_grav_export(trim(dir_path)//"/rnsgra_3D.las",coc2cac_readformatf,psi,alph,bvxd,bvyd,bvzd)
+     if (CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
+        call IO_input_matter_BHT_export(trim(dir_path)//"/rnsflu_3D.las",coc2cac_readformatf,emd,omef,ome,ber,radi)
+     else
+        call IO_input_CF_star_export(trim(dir_path)//"/rnsflu_3D.las",coc2cac_readformatf,emd,rs,omef,ome,ber,radi)
+     end if
+     call IO_input_grav_export_Kij(trim(dir_path)//"/rnsgra_Kij_3D.las",kxxa,kxya,kxza,kyya,kyza,kzza)
+
+     ! CF keeps h_ij = 0; WL/MRNS/BHT read non-trivial h_ij.
+     if (CCTK_EQUALS(coc2cac_rnstype, "RNS_WL") .or. CCTK_EQUALS(coc2cac_rnstype,"MRNS_WL") .or. &
+         CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
+        call IO_input_WL_grav_export_hij(trim(dir_path)//"/rnsgra_hij_3D.las",coc2cac_readformatf,hxxd,hxyd,hxzd,hyyd,hyzd,hzzd)
+     else if (CCTK_EQUALS(coc2cac_rnstype, "RNS_CF")) then
+        continue
+     else
+        call CCTK_WARN(CCTK_WARN_ABORT, "Invalid coc2cac_rnstype specified.")
+     end if
+
+     ! MRNS optionally reads EM potential or Faraday tensor, plus 4-velocity.
+     if (CCTK_EQUALS(coc2cac_rnstype,"MRNS_WL")) then
+        if (coc2cac_readpot == 1) then
+           call IO_input_grav_export_Ai(trim(dir_path)//"/rnsEMF_3D.las",coc2cac_readformatf,va,vaxd,vayd,vazd)
+        else if (coc2cac_readpot == 0) then
+           call IO_input_grav_export_Faraday(trim(dir_path)//"/rnsEMF_faraday_3D.las",coc2cac_readformatf,fxd,fyd,fzd,fxyd,fxzd,fyzd)
+        end if
+        call IO_input_star4ve_export(trim(dir_path)//"/rns4ve_3D.las",coc2cac_readformatf,utf,uxf,uyf,uzf)
+     end if
+
+     ! -- Internal auxiliary-grid construction used by the interpolation phase
+     call invhij_WL_export(hxxd,hxyd,hxzd,hyyd,hyzd,hzzd,hxxu,hxyu,hxzu,hyyu,hyzu,hzzu)
+     call index_vec_down2up_export(hxxu,hxyu,hxzu,hyyu,hyzu,hzzu,bvxu,bvyu,bvzu,bvxd,bvyd,bvzd)
+     if (.not. CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
+        call interpo_gr2fl_metric_CF_export(alph, psi, bvxu, bvyu, bvzu, alphf, psif, bvxuf, bvyuf, bvzuf, rs)
+     end if
+
+     have_read_data = .true.
+     if (verbose == 1) then
+        call CCTK_INFO("Done reading COCAL RNS data for this MPI rank.")
+     end if
+  end if
+  !$OMP END CRITICAL(coc2cac_rns_read)
+end subroutine coc2cac_read_rns_data
+
 subroutine coc2cac_main(CCTK_ARGUMENTS)
   DECLARE_CCTK_ARGUMENTS
   DECLARE_CCTK_FUNCTIONS
@@ -303,7 +494,7 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
         ccoordx, ccoordy, ccoordz
   end subroutine
 
-  subroutine coc2cac_bns(cctk_lsh, cctk_ash, &
+  subroutine coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
         alp, betax, betay, betaz, &
         gxx, gxy, gxz, gyy, gyz, gzz, &
         kxx, kxy, kxz, kyy, kyz, kzz, &
@@ -335,7 +526,7 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
          
     implicit none
 
-    integer, dimension(3) :: cctk_lsh, cctk_ash
+    integer, dimension(3) :: cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max
     CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)) :: &
         alp, betax, betay, betaz, &
         gxx, gxy, gxz, gyy, gyz, gzz, &
@@ -377,7 +568,7 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
   else if (CCTK_EQUALS(initial_data, "CocalBNS")) then
     call CCTK_INFO("Executing Main Cocal BNS Reader")
     
-    call coc2cac_bns(cctk_lsh, cctk_ash, &
+    call coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
       alp, betax, betay, betaz, &
       gxx, gxy, gxz, gyy, gyz, gzz, &
       kxx, kxy, kxz, kyy, kyz, kzz, &
@@ -722,194 +913,9 @@ end subroutine
 
       call CCTK_FortranString(coc2cac_readformatlen,coc2cac_readformat,coc2cac_readformatf)
 
-      ! -- Read parameters
-      !$OMP critical(coc2cac_rns_read)
       if (.not. have_read_data) then
-         if (verbose == 1) then
-            call CCTK_INFO("Reading data...")
-            call CCTK_INFO("Reading format: " // coc2cac_readformatf)
-            ! -- Read parameters
-            call CCTK_INFO("Cocal: Reading parameters...")
-         end if
-         call read_parameter_cactus(dir_path)
-         call peos_initialize_cactus(dir_path)
-         if (CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
-            call read_bht_parameter_cactus(dir_path) ! Unique to BHT
-            call calc_bht_excision_radius ! Unique to BHT
-            call grid_r_bht('eBH') ! Dfferent naming
-            rexc = rg(0)
-            write(outstr,'(F4.2)') rexc
-            if (verbose == 1) then
-               call CCTK_INFO("Excision at r="//outstr)
-            end if
-         else
-            call grid_r
-         end if
-         call grid_theta
-         call trig_grav_theta
-         call grid_phi
-         call allocate_trig_grav_mphi
-         call trig_grav_phi
-         call grid_extended
-      
-         ! -- Allocate arrays
-         if (verbose == 1) then 
-            call CCTK_INFO("Cocal: Allocating local arrays...")
-
-            write(outstr,'(6i5)') nrg, ntg, npg, nrf, ntf, npf
-            call CCTK_INFO("Cocal Grav grid, Fluid Grid Sizes: "//outstr)
-         end if
-         !
-         !    write(6,'(6i5)') nrg, ntg, npg, nrf, ntf, npf
-         !  rr3 = 0.7d0*(rgout - rgmid)
-         !  dis_cm = dis
-         allocate ( psif(0:nrf,0:ntf,0:npf))
-         allocate (alphf(0:nrf,0:ntf,0:npf))
-         allocate (bvxuf(0:nrf,0:ntf,0:npf))
-         allocate (bvyuf(0:nrf,0:ntf,0:npf))
-         allocate (bvzuf(0:nrf,0:ntf,0:npf))
-         if (verbose == 1) then 
-            call CCTK_INFO("Fluid Grid Allocated...")
-         end if
-         allocate ( bvxu(0:nrg,0:ntg,0:npg))
-         allocate ( bvyu(0:nrg,0:ntg,0:npg))
-         allocate ( bvzu(0:nrg,0:ntg,0:npg))
-         allocate ( hxxu(0:nrg,0:ntg,0:npg))
-         allocate ( hxyu(0:nrg,0:ntg,0:npg))
-         allocate ( hxzu(0:nrg,0:ntg,0:npg))
-         allocate ( hyyu(0:nrg,0:ntg,0:npg))
-         allocate ( hyzu(0:nrg,0:ntg,0:npg))
-         allocate ( hzzu(0:nrg,0:ntg,0:npg))
-         if (verbose == 1) then 
-            call CCTK_INFO("Gravitational Grid Allocated...")
-
-            call CCTK_INFO("Done Allocating...")
-         end if
-         psif=0.0d0; alphf=0.0d0; bvxuf=0.0d0; bvyuf=0.0d0; bvzuf=0.0d0 !
-
-         bvxu=0.0d0; bvyu=0.0d0;  bvzu=0.0d0
-         hxxu=0.0d0; hxyu=0.0d0;  hxzu=0.0d0;  hyyu=0.0d0;  hyzu=0.0d0;  hzzu=0.0d0;
-         if (verbose == 1) then 
-            call CCTK_INFO("Done initializing Varriables...")
-         end if 
-
-         allocate (  psi(0:nrg,0:ntg,0:npg))
-         allocate ( alph(0:nrg,0:ntg,0:npg))
-         allocate ( bvxd(0:nrg,0:ntg,0:npg))
-         allocate ( bvyd(0:nrg,0:ntg,0:npg))
-         allocate ( bvzd(0:nrg,0:ntg,0:npg))
-         psi=0.0d0;  alph=0.0d0;  bvxd=0.0d0;  bvyd=0.0d0;  bvzd=0.0d0
-
-         ! ome,ber,radi
-         allocate (   rs(0:ntf,0:npf))
-         if (.not. CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
-            allocate (  emd(0:nrf,0:ntf,0:npf))
-            allocate ( omef(0:nrf,0:ntf,0:npf))
-         else
-            allocate (  emd(0:nrg,0:ntg,0:npg))
-            allocate ( omef(0:nrg,0:ntg,0:npg))
-         end if
-         emd=0.0d0;  rs  =0.0d0;  omef=0.0d0
-
-         allocate (  kxxa(0:nrg,0:ntg,0:npg))
-         allocate (  kxya(0:nrg,0:ntg,0:npg))
-         allocate (  kxza(0:nrg,0:ntg,0:npg))
-         allocate (  kyya(0:nrg,0:ntg,0:npg))
-         allocate (  kyza(0:nrg,0:ntg,0:npg))
-         allocate (  kzza(0:nrg,0:ntg,0:npg))
-         kxxa=0.0d0;  kxya =0.0d0;  kxza =0.0d0;   kyya=0.0d0;   kyza=0.0d0;   kzza=0.0d0
-
-         allocate ( hxxd(0:nrg,0:ntg,0:npg))
-         allocate ( hxyd(0:nrg,0:ntg,0:npg))
-         allocate ( hxzd(0:nrg,0:ntg,0:npg))
-         allocate ( hyyd(0:nrg,0:ntg,0:npg))
-         allocate ( hyzd(0:nrg,0:ntg,0:npg))
-         allocate ( hzzd(0:nrg,0:ntg,0:npg))
-         hxxd=0.0d0; hxyd=0.0d0;  hxzd=0.0d0;  hyyd=0.0d0;  hyzd=0.0d0;  hzzd=0.0d0;
-
-         if (CCTK_EQUALS(coc2cac_rnstype,"MRNS_WL")) then
-            allocate (  utf(0:nrf,0:ntf,0:npf)) ! fluid 4vel
-            allocate (  uxf(0:nrf,0:ntf,0:npf)) !
-            allocate (  uyf(0:nrf,0:ntf,0:npf)) !
-            allocate (  uzf(0:nrf,0:ntf,0:npf)) !
-            utf=0.0d0;  uxf=0.0d0;   uyf=0.0d0;   uzf=0.0d0;     !fluid 4 vel init
-            if (coc2cac_readpot == 1) then
-               allocate (   va(0:nrg,0:ntg,0:npg)) !(phi,A)
-               allocate ( vaxd(0:nrg,0:ntg,0:npg))
-               allocate ( vayd(0:nrg,0:ntg,0:npg))
-               allocate ( vazd(0:nrg,0:ntg,0:npg))
-               va=0.0d0;    vaxd=0.0d0;  vayd=0.0d0;   vazd=0.0d0;
-            else if (coc2cac_readpot == 0) then
-               allocate (  fxd(0:nrg,0:ntg,0:npg)) !Faraday tensor
-               allocate (  fyd(0:nrg,0:ntg,0:npg))
-               allocate (  fzd(0:nrg,0:ntg,0:npg))
-               allocate ( fxyd(0:nrg,0:ntg,0:npg))
-               allocate ( fxzd(0:nrg,0:ntg,0:npg))
-               allocate ( fyzd(0:nrg,0:ntg,0:npg))
-               fxd=0.0d0;   fyd=0.0d0;   fzd=0.0d0;    fxyd=0.0d0;   fxzd=0.0d0;  fyzd=0.0d0;
-            end if
-         end if
-
-         call IO_input_CF_grav_export(trim(dir_path)//"/rnsgra_3D.las",coc2cac_readformatf,psi,alph,bvxd,bvyd,bvzd)
-
-         if (CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
-            call IO_input_matter_BHT_export(trim(dir_path)//"/rnsflu_3D.las",coc2cac_readformatf,emd,omef,ome,ber,radi)
-         else
-            call IO_input_CF_star_export(trim(dir_path)//"/rnsflu_3D.las",coc2cac_readformatf,emd,rs,omef,ome,ber,radi)
-         end if
-
-         call IO_input_grav_export_Kij(trim(dir_path)//"/rnsgra_Kij_3D.las",kxxa,kxya,kxza,kyya,kyza,kzza)
-
-         ! LET CF h_ij's remain initialized to zero.
-         ! Only CF change is that h_ij = 0, everything else remains the same.
-         ! Only non-trivial change between CF and WL
-         if (CCTK_EQUALS(coc2cac_rnstype, "RNS_WL") .or. CCTK_EQUALS(coc2cac_rnstype,"MRNS_WL") .or. (CCTK_EQUALS(coc2cac_rnstype, "BHT_WL"))) then
-            call IO_input_WL_grav_export_hij(trim(dir_path)//"/rnsgra_hij_3D.las",coc2cac_readformatf,hxxd,hxyd,hxzd,hyyd,hyzd,hzzd)
-         else if (CCTK_EQUALS(coc2cac_rnstype, "RNS_CF")) then
-            continue
-         else
-            call CCTK_WARN(CCTK_WARN_ABORT, "Invalid coc2cac_rnstype specified.")
-         end if
-
-
-         if (CCTK_EQUALS(coc2cac_rnstype,"MRNS_WL")) then
-            if (coc2cac_readpot == 1) then
-               call IO_input_grav_export_Ai(trim(dir_path)//"/rnsEMF_3D.las",coc2cac_readformatf,va,vaxd,vayd,vazd)
-            else if (coc2cac_readpot == 0) then
-               call IO_input_grav_export_Faraday(trim(dir_path)//"/rnsEMF_faraday_3D.las",coc2cac_readformatf,fxd,fyd,fzd,fxyd,fxzd,fyzd)
-            end if
-            call IO_input_star4ve_export(trim(dir_path)//"/rns4ve_3D.las",coc2cac_readformatf,utf,uxf,uyf,uzf) ! fluid 4vel
-         end if
-
-         if (verbose ==1) then
-            write(outstr,'(2e20.12)') emd(0,0,0), omef(0,0,0)
-            call CCTK_INFO("Cocal: Central values of emd, omef: "//outstr)
-            write(outstr,'(3e20.12)') ome, ber, radi
-            call CCTK_INFO("Cocal: Global values of ome, ber, radi: "//outstr)
-            call CCTK_INFO("Cocal: Beginning Internal Aux. Grid Construction...")
-         end if
-         
-         call invhij_WL_export(hxxd,hxyd,hxzd,hyyd,hyzd,hzzd,hxxu,hxyu,hxzu,hyyu,hyzu,hzzu) !trivial for CF 0=0
-
-         call index_vec_down2up_export(hxxu,hxyu,hxzu,hyyu,hyzu,hzzu,bvxu,bvyu,bvzu,bvxd,bvyd,bvzd) !trivial for CF, u=d
-
-         if (.not. CCTK_EQUALS(coc2cac_rnstype, "BHT_WL")) then
-            call interpo_gr2fl_metric_CF_export(alph, psi, bvxu, bvyu, bvzu, alphf, psif, bvxuf, bvyuf, bvzuf, rs) !Main Interpolation
-         end if
-         
-
-         !  call excurve_CF_gridpoint_export(alph,bvxd,bvyd,bvzd, & 
-         !     &    axx, axy, axz, ayy, ayz, azz)
-         
-         if (verbose == 1) then
-            call CCTK_INFO("Cocal: Finished Internal Aux. Grid Construction")
-            call CCTK_INFO("Done reading data...")
-            call CCTK_INFO("Cocal: Looping over local cartesian grid:")
-         end if
-
-         have_read_data = .true.
+         call CCTK_ERROR("COCAL_IDX::coc2cac_rns called before coc2cac_read_rns_data completed. Refusing fallback per-level read.")
       end if
-      !$OMP END CRITICAL(coc2cac_rns_read)
       
          do k = kmin, kmax
             do j = jmin, jmax
@@ -1391,7 +1397,7 @@ END subroutine coc2cac_rns
  !      MASTER CF BNS COCAL ID READER to CACTUS
  !______________________________________________
 
-SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, &
+SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
       alp, betax, betay, betaz, &
       gxx, gxy, gxz, gyy, gyz, gzz, &
       kxx, kxy, kxz, kyy, kyz, kzz, &
@@ -1426,7 +1432,7 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, &
 
    implicit none
 
-   integer, dimension(3) :: cctk_lsh, cctk_ash
+   integer, dimension(3) :: cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max
    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)) :: &
        alp, betax, betay, betaz, &
        gxx, gxy, gxz, gyy, gyz, gzz, &
@@ -1453,7 +1459,7 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, &
 
    DECLARE_CCTK_FUNCTIONS
    DECLARE_CCTK_PARAMETERS
-   integer :: i, j, k, nx, ny, nz
+   integer :: i, j, k, imin, imax, jmin, jmax, kmin, kmax
    integer :: impt, impt_ex, ico, irr, isp, igrid
 
    logical ::  bool_lapse, bool_shift, bool_hydro, bool_Bvec
@@ -1922,9 +1928,12 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, &
       call CCTK_INFO("Cocal: Looping over local cartesian grid:")
    end if
  
-   nx = cctk_lsh(1) - centering(1,cent)
-   ny = cctk_lsh(2) - centering(2,cent)
-   nz = cctk_lsh(3) - centering(3,cent)
+   imin = max(1, 1 + cctk_tile_min(1))
+   jmin = max(1, 1 + cctk_tile_min(2))
+   kmin = max(1, 1 + cctk_tile_min(3))
+   imax = min(cctk_lsh(1) - centering(1,cent), cctk_tile_max(1))
+   jmax = min(cctk_lsh(2) - centering(2,cent), cctk_tile_max(2))
+   kmax = min(cctk_lsh(3) - centering(3,cent), cctk_tile_max(3))
    if (CCTK_EQUALS(initial_hydro, "Cocal")) then
       bool_hydro = .true.
     else
@@ -1951,9 +1960,9 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, &
    ! write(6,'(a23,3e20.12)') "Point given wrt CACTUS:", xcac,ycac,zcac
    ! write(6,'(a38,2e20.12)') "Cocal radius scale in COCP-1, COCP-2 :", radi_p1, radi_p2
    ! write(6,'(a38,2e20.12)') "Cocal surface scale in COCP-1, COCP-2:", r_surf_p1, r_surf_p2
-   do k = 1, nz
-     do j = 1, ny
-       do i = 1, nx
+   do k = kmin, kmax
+     do j = jmin, jmax
+       do i = imin, imax
          xcac = x(i,j,k)
          ycac = y(i,j,k)
          zcac = z(i,j,k)
@@ -2758,4 +2767,3 @@ end do
      read_id_type = 0
    end function read_id_type
  END SUBROUTINE coc2cac_bns
-
