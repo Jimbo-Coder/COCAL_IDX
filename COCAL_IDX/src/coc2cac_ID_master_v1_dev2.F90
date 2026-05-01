@@ -195,6 +195,7 @@ module cocal_data_bns
 
    real(8), save :: ome_p1, ber_p1, radi_p1, r_surf_p1
    real(8), save :: ome_p2, ber_p2, radi_p2, r_surf_p2
+   real(8), save :: confpow_p1, confpow_p2
    integer, save :: nrg_p1,  ntg_p1, npg_p1, nrf_p1, ntf_p1, npf_p1
    integer, save :: nrg_p2,  ntg_p2, npg_p2, nrf_p2, ntf_p2, npf_p2
    integer, save :: nrg_p3,  ntg_p3, npg_p3, nrf_p3, ntf_p3, npf_p3
@@ -233,6 +234,434 @@ module cocal_data_bns
  
    logical, save :: have_read_data = .false.
  end module cocal_data_bns
+
+subroutine coc2cac_read_bns_data(CCTK_ARGUMENTS)
+  use grid_parameter_binary_excision
+  use phys_constant
+  use grid_parameter, eps_cocal => eps
+  use coordinate_grav_r
+  use coordinate_grav_extended
+  use interface_modules_cartesian
+  use trigonometry_grav_phi
+  use def_binary_parameter, only : dis
+  use def_matter_parameter_mpt
+  use interface_IO_input_CF_grav_export
+  use interface_IO_input_CF_flir_export
+  use interface_IO_input_CF_flco_export
+  use interface_IO_input_CF_flsp_export
+  use interface_IO_input_CF_surf_export
+  use interface_IO_input_grav_export_Kij
+  use interface_interpo_gr2fl_metric_CF_export
+  use interface_IO_input_gradvep_export
+  use cocal_data_bns
+
+  implicit none
+
+  DECLARE_CCTK_ARGUMENTS
+  DECLARE_CCTK_FUNCTIONS
+  DECLARE_CCTK_PARAMETERS
+
+  integer :: impt, igrid
+  character(400) :: outstr
+  real(8) :: gxx1, gxy1, gxz1, gyy1, gyz1, gzz1
+  real(8) :: kxx1, kxy1, kxz1, kyy1, kyz1, kzz1
+  real(8) :: axx, axy, axz, ayy, ayz, azz
+
+   !$OMP critical(coc2cac_bns_read)
+   if (.not. have_read_data) then
+      call CCTK_FortranString(dir_path_len,coc2cac_dir_path_ID,dir_path)  !For reading initial data
+      call CCTK_FortranString(coc2cac_readformatlen,coc2cac_readformat,coc2cac_readformatf)
+
+      if (verbose == 1) then
+         call CCTK_INFO("Reading COCAL BNS data once for this MPI rank...")
+         call CCTK_INFO("Reading format: " // coc2cac_readformatf)
+         call CCTK_INFO("Reading parameters...")
+      end if
+
+      ierr = read_id_type(trim(dir_path)//"/rnspar_mpt1.dat",id_type)
+
+         ! -- Read ID type
+      if (verbose == 1) then
+         call CCTK_INFO("Reading BNS Type")
+         write(outstr,'(a10,a2)') "BNS Type: ", id_type
+         call CCTK_INFO(outstr)
+         call CCTK_INFO(trim(id_type))
+      end if
+
+      !
+      if (ierr.ne.0)     call CCTK_INFO("Problem reading file rnspar_mpt1.dat.")
+      if (verbose == 1) then 
+         select case (trim(id_type))
+         case ("CO")
+            call CCTK_INFO("Reading corotating BNS ID")
+         case ("IR")
+            call CCTK_INFO("Reading irrotational BNS ID")
+         case ("SP")
+            call CCTK_INFO("Reading spinning BNS ID")
+         end select
+      end if
+   !
+   ! The coc2cac_ini_sub.F90 subroutine has here option for zero initial shift
+   !
+      gxx1=0.0d0; gxy1=0.0d0; gxz1=0.0d0; gyy1=0.0d0; gyz1=0.0d0; gzz1=0.0d0
+      kxx1=0.0d0; kxy1=0.0d0; kxz1=0.0d0; kyy1=0.0d0; kyz1=0.0d0; kzz1=0.0d0
+      axx=0.0d0; axy=0.0d0; axz=0.0d0; ayy=0.0d0; ayz=0.0d0; azz=0.0d0
+   
+      !TODO remove this
+      !dir_path="/home/astro/mundim/tmp/ET_2014_05_wheeler/Cactus/repos/Cocal/standalone/Cocal/ID_BNS"
+      !dir_path="../../standalone/Cocal/ID_BNS"
+      !dir_path='.'
+      if (verbose == 1) then 
+         call CCTK_INFO("In coc2cac_ir: dir_path="//dir_path)
+      end if 
+   
+   !--------------------- Choose gravitational grid -----------------------
+   !igrid3  igrid = 3     ! 3:r_surf is used
+      igrid = 4     ! 4:r_surf=1.0
+   !-----------------------------------------------------------------------
+
+       ! -- Read parameters
+      call allocate_grid_parameter_mpt
+      call allocate_grid_parameter_binary_excision_mpt
+      call allocate_def_matter_parameter_mpt
+      do impt = 1, nmpt
+         if (verbose == 1) then
+            call CCTK_INFO("read_parameter_mpt_cactus")
+         end if
+         call read_parameter_mpt_cactus(impt,dir_path)
+         indata_type = '3D'
+         if (verbose ==1) then
+            call CCTK_INFO("read_surf_parameter_mpt_cactus")
+         end if
+         if (impt .le. 2) call read_surf_parameter_mpt_cactus(impt,dir_path)
+         call copy_grid_parameter_to_mpt(impt)
+         if (verbose == 1) then 
+            call CCTK_INFO("read_parameter_binary_excision_mpt_cactus")
+         end if
+         call read_parameter_binary_excision_mpt_cactus(impt,dir_path)
+         call copy_grid_parameter_binary_excision_to_mpt(impt)
+         if (verbose == 1) then
+            call CCTK_INFO("peos_initialize_mpt_cactus")
+         end if
+         if (impt .le. 2) call peos_initialize_mpt_cactus(impt,dir_path)
+         call copy_def_peos_parameter_to_mpt(impt)
+      end do
+   
+   ! -- Allocate arrays
+      if (verbose == 1) then 
+         call CCTK_INFO("Allocating saved BNS arrays...")
+      end if
+   
+      call set_allocate_size_mpt
+      call allocate_trig_grav_mphi
+      call allocate_trigonometry_grav_phi_mpt
+   !
+      do impt = 1, nmpt
+         call copy_grid_parameter_from_mpt(impt)
+         call copy_grid_parameter_binary_excision_from_mpt(impt)
+         call copy_def_peos_parameter_from_mpt(impt)
+         call coordinate_patch_kit_grav_grid_coc2cac_mpt(igrid)  ! 3:r_surf is used
+         call calc_parameter_binary_excision
+         call copy_grid_parameter_to_mpt(impt)
+         call copy_grid_parameter_binary_excision_to_mpt(impt)
+         call copy_coordinate_grav_extended_to_mpt(impt)
+         call copy_coordinate_grav_phi_to_mpt(impt)
+         call copy_coordinate_grav_r_to_mpt(impt)
+         call copy_coordinate_grav_theta_to_mpt(impt)
+         call copy_def_binary_parameter_to_mpt(impt)
+         call copy_trigonometry_grav_phi_to_mpt(impt)
+         call copy_trigonometry_grav_theta_to_mpt(impt)
+      end do
+      
+      if (verbose == 1) then
+         call CCTK_INFO("Internal reading info (BEGIN):")
+      end if
+      
+      do impt = 1,nmpt
+ !=>    call copy_from_mpatch_interpolation_utility(impt)
+         call copy_grid_parameter_from_mpt(impt)
+         call copy_grid_parameter_binary_excision_from_mpt(impt)
+         call copy_coordinate_grav_extended_from_mpt(impt)
+         call copy_coordinate_grav_phi_from_mpt(impt)
+         call copy_coordinate_grav_r_from_mpt(impt)
+         call copy_coordinate_grav_theta_from_mpt(impt)
+         call copy_def_binary_parameter_from_mpt(impt)
+         call copy_trigonometry_grav_phi_from_mpt(impt)
+         call copy_trigonometry_grav_theta_from_mpt(impt)
+      
+      !    write(6,'(6i5)') nrg, ntg, npg, nrf, ntf, npf
+         if (impt==1) then
+            nrg_p1=nrg;  ntg_p1=ntg;  npg_p1=npg;  nrf_p1=nrf;  ntf_p1=ntf;  npf_p1=npf
+            if (verbose == 1) then 
+               call CCTK_INFO("Allocating star1...")
+            end if
+            allocate (       rg_p1( 0:nnrg))
+            allocate (     rgex_p1(-2:nnrg+2))
+            allocate (    thgex_p1(-2:nntg+2))
+            allocate (   phigex_p1(-2:nnpg+2))
+            allocate (  irgex_r_p1(-2:nnrg+2))
+            allocate ( itgex_th_p1(-2:nntg+2))
+            allocate (ipgex_phi_p1(-2:nnpg+2))
+      
+            allocate ( itgex_r_p1(0:nntg,-2:nnrg+2))
+            allocate ( ipgex_r_p1(0:nnpg,-2:nnrg+2))
+            allocate (ipgex_th_p1(0:nnpg,-2:nntg+2))
+      
+            rg_p1=rg;    rgex_p1=rgex;    thgex_p1=thgex;    phigex_p1=phigex
+            irgex_r_p1=irgex_r;  itgex_th_p1=itgex_th;  ipgex_phi_p1=ipgex_phi
+            itgex_r_p1=itgex_r;  ipgex_r_p1=ipgex_r;    ipgex_th_p1=ipgex_th
+      
+            rr3 = 0.7d0*(rgout - rgmid)
+            dis_cm = dis
+            r_surf_p1 = r_surf
+            
+      
+            allocate (  emd_p1(0:nrf,0:ntf,0:npf))
+            select case (trim(id_type))
+               case ("IR","SP")
+                  allocate (  vep_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  allocate (vepxf_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  allocate (vepyf_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  allocate (vepzf_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  vep_p1 =0.0d0;  vepxf_p1=0.0d0;  vepyf_p1=0.0d0;  vepzf_p1=0.0d0 ! Unique to IR/SP, SP has 3 more
+                  select case (trim(id_type))
+                     case ("SP")
+                        allocate (wxspf_p1(0:nrf,0:ntf,0:npf)) ! Unique to SP
+                        allocate (wyspf_p1(0:nrf,0:ntf,0:npf)) ! Unique to SP
+                        allocate (wzspf_p1(0:nrf,0:ntf,0:npf)) ! Unique to SP
+                        wxspf_p1=0.0d0; wyspf_p1=0.0d0; wzspf_p1=0.0d0 ! Unique to SP
+                  end select
+            end select
+            allocate ( psif_p1(0:nrf,0:ntf,0:npf))
+            allocate (alphf_p1(0:nrf,0:ntf,0:npf))
+            allocate (bvxdf_p1(0:nrf,0:ntf,0:npf))
+            allocate (bvydf_p1(0:nrf,0:ntf,0:npf))
+            allocate (bvzdf_p1(0:nrf,0:ntf,0:npf))
+            allocate (   rs_p1(0:ntf,0:npf))
+            allocate (  psi_p1(0:nrg,0:ntg,0:npg))
+            allocate ( alph_p1(0:nrg,0:ntg,0:npg))
+            allocate ( bvxd_p1(0:nrg,0:ntg,0:npg))
+            allocate ( bvyd_p1(0:nrg,0:ntg,0:npg))
+            allocate ( bvzd_p1(0:nrg,0:ntg,0:npg))
+            allocate (  axx_p1(0:nrg,0:ntg,0:npg))
+            allocate (  axy_p1(0:nrg,0:ntg,0:npg))
+            allocate (  axz_p1(0:nrg,0:ntg,0:npg))
+            allocate (  ayy_p1(0:nrg,0:ntg,0:npg))
+            allocate (  ayz_p1(0:nrg,0:ntg,0:npg))
+            allocate (  azz_p1(0:nrg,0:ntg,0:npg))
+            if (verbose == 1) then 
+               call CCTK_INFO("Done allocating star 1...")
+         
+               write(outstr,'(a13,i1,a8)') "Reading COCP-", impt, " data..."
+               call CCTK_INFO(outstr)
+            end if 
+
+            
+            emd_p1=0.0d0;  rs_p1  =0.0d0;  
+            psi_p1=0.0d0;  alph_p1=0.0d0;  bvxd_p1=0.0d0;  bvyd_p1=0.0d0;  bvzd_p1=0.0d0
+            axx_p1=0.0d0;  axy_p1 =0.0d0;  axz_p1 =0.0d0;   ayy_p1=0.0d0;   ayz_p1=0.0d0;   azz_p1=0.0d0
+      
+            call IO_input_CF_grav_export(trim(dir_path)//"/bnsgra_3D_mpt1.las",coc2cac_readformatf,psi_p1,alph_p1,bvxd_p1,bvyd_p1,bvzd_p1)
+            select case (trim(id_type))
+               case("CO")
+                  call IO_input_CF_flco_export(trim(dir_path)//"/bnsflu_3D_mpt1.las",coc2cac_readformatf,emd_p1,ome_p1,ber_p1,radi_p1)
+               case("IR")
+                  call IO_input_CF_flir_export(trim(dir_path)//"/bnsflu_3D_mpt1.las",coc2cac_readformatf,emd_p1,vep_p1,ome_p1,ber_p1,radi_p1) ! This line changes for IR/CO/SP
+               case("SP")
+                  call IO_input_CF_flsp_export(trim(dir_path)//"/bnsflu_3D_mpt1.las",coc2cac_readformatf,emd_p1,vep_p1,wxspf_p1,wyspf_p1,wzspf_p1,ome_p1,ber_p1,radi_p1,confpow_p1)
+            end select
+                  
+      
+            call IO_input_CF_surf_export(trim(dir_path)//"/bnssur_3D_mpt1.las",coc2cac_readformatf,rs_p1)
+      
+      !      call excurve_CF_gridpoint_export(alph_p1,bvxd_p1,bvyd_p1,bvzd_p1, axx_p1, axy_p1, axz_p1, ayy_p1, ayz_p1, azz_p1)
+      
+            call IO_input_grav_export_Kij(trim(dir_path)//"/bnsgra_Kij_3D_mpt1.las", axx_p1, axy_p1, axz_p1, ayy_p1, ayz_p1, azz_p1)
+      
+            call interpo_gr2fl_metric_CF_export(alph_p1, psi_p1, bvxd_p1, bvyd_p1, bvzd_p1, &
+               &    alphf_p1, psif_p1, bvxdf_p1, bvydf_p1, bvzdf_p1, rs_p1)
+      
+      !      call calc_gradvep_export(vep_p1,vepxf_p1,vepyf_p1,vepzf_p1,rs_p1)
+
+            select case (trim(id_type))
+               case ("IR","SP")
+                  call IO_input_gradvep_export(trim(dir_path)//"/bnsdvep_3D_mpt1.las",coc2cac_readformatf,  vepxf_p1, vepyf_p1, vepzf_p1) ! Unique to IR/SP
+            end select
+      
+         end if
+         if (impt==2) then
+            if (verbose == 1) then
+               call CCTK_INFO("Allocating star2...")
+            end if
+            nrg_p2=nrg;  ntg_p2=ntg;  npg_p2=npg;  nrf_p2=nrf;  ntf_p2=ntf;  npf_p2=npf
+            allocate (       rg_p2( 0:nnrg))
+            allocate (     rgex_p2(-2:nnrg+2))
+            allocate (    thgex_p2(-2:nntg+2))
+            allocate (   phigex_p2(-2:nnpg+2))
+            allocate (  irgex_r_p2(-2:nnrg+2))
+            allocate ( itgex_th_p2(-2:nntg+2))
+            allocate (ipgex_phi_p2(-2:nnpg+2))
+      
+            allocate ( itgex_r_p2(0:nntg,-2:nnrg+2))
+            allocate ( ipgex_r_p2(0:nnpg,-2:nnrg+2))
+            allocate (ipgex_th_p2(0:nnpg,-2:nntg+2))
+      
+            rg_p2=rg;    rgex_p2=rgex;    thgex_p2=thgex;    phigex_p2=phigex
+            irgex_r_p2=irgex_r;  itgex_th_p2=itgex_th;  ipgex_phi_p2=ipgex_phi
+            itgex_r_p2=itgex_r;  ipgex_r_p2=ipgex_r;    ipgex_th_p2=ipgex_th
+      
+            r_surf_p2 = r_surf
+            
+      
+            allocate (  emd_p2(0:nrf,0:ntf,0:npf))
+            select case (trim(id_type))
+               case ("IR","SP")
+                  allocate (  vep_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  allocate (vepxf_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  allocate (vepyf_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  allocate (vepzf_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
+                  vep_p2 =0.0d0;  vepxf_p2=0.0d0;  vepyf_p2=0.0d0;  vepzf_p2=0.0d0 ! Unique to IR/SP, SP has 3 more
+                  select case (trim(id_type))
+                     case ("SP")
+                        allocate (wxspf_p2(0:nrf,0:ntf,0:npf)) ! Unique to SP
+                        allocate (wyspf_p2(0:nrf,0:ntf,0:npf)) ! Unique to SP
+                        allocate (wzspf_p2(0:nrf,0:ntf,0:npf)) ! Unique to SP
+                        wxspf_p2=0.0d0; wyspf_p2=0.0d0; wzspf_p2=0.0d0 ! Unique to SP
+                  end select
+            end select
+            allocate ( psif_p2(0:nrf,0:ntf,0:npf))
+            allocate (alphf_p2(0:nrf,0:ntf,0:npf))
+            allocate (bvxdf_p2(0:nrf,0:ntf,0:npf))
+            allocate (bvydf_p2(0:nrf,0:ntf,0:npf))
+            allocate (bvzdf_p2(0:nrf,0:ntf,0:npf))
+            allocate (   rs_p2(0:ntf,0:npf))
+            allocate (  psi_p2(0:nrg,0:ntg,0:npg))
+            allocate ( alph_p2(0:nrg,0:ntg,0:npg))
+            allocate ( bvxd_p2(0:nrg,0:ntg,0:npg))
+            allocate ( bvyd_p2(0:nrg,0:ntg,0:npg))
+            allocate ( bvzd_p2(0:nrg,0:ntg,0:npg))
+            allocate (  axx_p2(0:nrg,0:ntg,0:npg))
+            allocate (  axy_p2(0:nrg,0:ntg,0:npg))
+            allocate (  axz_p2(0:nrg,0:ntg,0:npg))
+            allocate (  ayy_p2(0:nrg,0:ntg,0:npg))
+            allocate (  ayz_p2(0:nrg,0:ntg,0:npg))
+            allocate (  azz_p2(0:nrg,0:ntg,0:npg))
+            if (verbose == 1) then 
+               call CCTK_INFO("Done allocating star 2...")
+               write(outstr,'(a13,i1,a8)') "Reading COCP-", impt, " data..."
+               call CCTK_INFO(outstr)
+            end if
+
+            emd_p2=0.0d0;  rs_p2=0.0d0
+            psi_p2=0.0d0;  alph_p2=0.0d0;  bvxd_p2=0.0d0;   bvyd_p2=0.0d0;  bvzd_p2=0.0d0
+            axx_p2=0.0d0;   axy_p2=0.0d0;   axz_p2=0.0d0;    ayy_p2=0.0d0;   ayz_p2=0.0d0;   azz_p2=0.0d0
+      
+            call IO_input_CF_grav_export(trim(dir_path)//"/bnsgra_3D_mpt2.las",coc2cac_readformatf,psi_p2,alph_p2,bvxd_p2,bvyd_p2,bvzd_p2)
+      
+            select case (trim(id_type))
+            case("CO")
+               call IO_input_CF_flco_export(trim(dir_path)//"/bnsflu_3D_mpt2.las",coc2cac_readformatf,emd_p2,ome_p2,ber_p2,radi_p2)
+            case("IR")
+               call IO_input_CF_flir_export(trim(dir_path)//"/bnsflu_3D_mpt2.las",coc2cac_readformatf,emd_p2,vep_p2,ome_p2,ber_p2,radi_p2) ! This line changes for IR/CO/SP
+            case("SP")
+               call IO_input_CF_flsp_export(trim(dir_path)//"/bnsflu_3D_mpt2.las",coc2cac_readformatf,emd_p2,vep_p2,wxspf_p2,wyspf_p2,wzspf_p2,ome_p2,ber_p2,radi_p2,confpow_p2)
+            end select
+      
+            call IO_input_CF_surf_export(trim(dir_path)//"/bnssur_3D_mpt2.las",coc2cac_readformatf,rs_p2)
+      
+      !      call excurve_CF_gridpoint_export(alph_p2,bvxd_p2,bvyd_p2,bvzd_p2,  axx_p2, axy_p2, axz_p2, ayy_p2, ayz_p2, azz_p2)
+      
+            call IO_input_grav_export_Kij(trim(dir_path)//"/bnsgra_Kij_3D_mpt2.las", axx_p2, axy_p2, axz_p2, ayy_p2, ayz_p2, azz_p2)
+      
+            call interpo_gr2fl_metric_CF_export(alph_p2, psi_p2, bvxd_p2, bvyd_p2, bvzd_p2, &
+               &    alphf_p2, psif_p2, bvxdf_p2, bvydf_p2, bvzdf_p2, rs_p2)
+      
+      !      call calc_gradvep_export(vep_p2,vepxf_p2,vepyf_p2,vepzf_p2,rs_p2)
+      
+            select case (trim(id_type))
+               case ("IR","SP")
+                  call IO_input_gradvep_export(trim(dir_path)//"/bnsdvep_3D_mpt2.las",coc2cac_readformatf,  vepxf_p2, vepyf_p2, vepzf_p2) ! Unique to IR/SP
+                  vepxf_p2 = - vepxf_p2 ! Unique to IR/SP
+                  vepyf_p2 = - vepyf_p2 ! Unique to IR/SP
+                  select case (trim(id_type))
+                     case ("SP")
+                        wxspf_p2 = - wxspf_p2 !unique to SP
+                        wyspf_p2 = - wyspf_p2 !unique to SP
+                  end select
+            end select
+            bvxdf_p2 = - bvxdf_p2
+            bvydf_p2 = - bvydf_p2
+            bvxd_p2  = - bvxd_p2
+            bvyd_p2  = - bvyd_p2
+            axz_p2   = - axz_p2
+            ayz_p2   = - ayz_p2
+         end if
+         if (impt==3) then
+            nrg_p3=nrg;  ntg_p3=ntg;  npg_p3=npg;  nrf_p3=nrf;  ntf_p3=ntf;  npf_p3=npf
+            allocate (       rg_p3( 0:nnrg))
+            allocate (     rgex_p3(-2:nnrg+2))
+            allocate (    thgex_p3(-2:nntg+2))
+            allocate (   phigex_p3(-2:nnpg+2))
+            allocate (  irgex_r_p3(-2:nnrg+2))
+            allocate ( itgex_th_p3(-2:nntg+2))
+            allocate (ipgex_phi_p3(-2:nnpg+2))
+      
+            allocate ( itgex_r_p3(0:nntg,-2:nnrg+2))
+            allocate ( ipgex_r_p3(0:nnpg,-2:nnrg+2))
+            allocate (ipgex_th_p3(0:nnpg,-2:nntg+2))
+      
+            rg_p3=rg;    rgex_p3=rgex;    thgex_p3=thgex;    phigex_p3=phigex
+            irgex_r_p3=irgex_r;  itgex_th_p3=itgex_th;  ipgex_phi_p3=ipgex_phi
+            itgex_r_p3=itgex_r;  ipgex_r_p3=ipgex_r;    ipgex_th_p3=ipgex_th
+            if (verbose == 1) then
+               write(outstr,'(a13,i1,a8)') "Reading ARCP-", impt, " data..."
+               call CCTK_INFO(outstr)
+            end if
+
+            allocate ( psi_p3(0:nrg,0:ntg,0:npg))
+            allocate (alph_p3(0:nrg,0:ntg,0:npg))
+            allocate (bvxd_p3(0:nrg,0:ntg,0:npg))
+            allocate (bvyd_p3(0:nrg,0:ntg,0:npg))
+            allocate (bvzd_p3(0:nrg,0:ntg,0:npg))
+            allocate ( axx_p3(0:nrg,0:ntg,0:npg))
+            allocate ( axy_p3(0:nrg,0:ntg,0:npg))
+            allocate ( axz_p3(0:nrg,0:ntg,0:npg))
+            allocate ( ayy_p3(0:nrg,0:ntg,0:npg))
+            allocate ( ayz_p3(0:nrg,0:ntg,0:npg))
+            allocate ( azz_p3(0:nrg,0:ntg,0:npg))
+            psi_p3=0.0d0;  alph_p3=0.0d0;  bvxd_p3=0.0d0;  bvyd_p3=0.0d0; bvzd_p3=0.0d0
+            axx_p3=0.0d0;   axy_p3=0.0d0;   axz_p3=0.0d0;   ayy_p3=0.0d0;  ayz_p3=0.0d0; azz_p3=0.0d0
+      
+            call IO_input_CF_grav_export(trim(dir_path)//"/bnsgra_3D_mpt3.las",coc2cac_readformatf,psi_p3,alph_p3,bvxd_p3,bvyd_p3,bvzd_p3)
+            
+            call IO_input_grav_export_Kij(trim(dir_path)//"/bnsgra_Kij_3D_mpt3.las", axx_p3, axy_p3, axz_p3, ayy_p3, ayz_p3, azz_p3)
+      
+      !      call excurve_CF_gridpoint_export(alph_p3,bvxd_p3,bvyd_p3,bvzd_p3, axx_p3, axy_p3, axz_p3, ayy_p3, ayz_p3, azz_p3)
+      
+         end if
+      end do
+      have_read_data = .true.
+      if (verbose == 1) then
+         call CCTK_INFO("Done reading COCAL BNS data for this MPI rank.")
+      end if
+   end if
+   !$OMP END critical(coc2cac_bns_read)
+
+  contains
+  integer function read_id_type(filename,id_type)
+    implicit none
+    integer :: nrg, nrf, nrf_deform, nrgin
+    character(len=*) :: filename
+    character(2) :: id_type, EQ_point
+
+    open(unit = 1,file = trim(filename), status='old')
+    read(1,'(4i5)') nrg
+    read(1,'(4i5)') nrf
+    read(1,'(2i5,2(3x,a2))') nrf_deform, nrgin, id_type, EQ_point
+    close(1)
+    read_id_type = 0
+  end function read_id_type
+end subroutine coc2cac_read_bns_data
 
 subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
   use grid_parameter, eps_cocal => eps
@@ -274,7 +703,7 @@ subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
      if (verbose == 1) then
         call CCTK_INFO("Reading COCAL RNS data once for this MPI rank...")
         call CCTK_INFO("Reading format: " // coc2cac_readformatf)
-        call CCTK_INFO("Cocal: Reading parameters...")
+        call CCTK_INFO("Reading parameters...")
      end if
      ! -- Read parameters and build COCAL grids
      call read_parameter_cactus(dir_path)
@@ -299,9 +728,9 @@ subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
      call grid_extended
 
      if (verbose == 1) then
-        call CCTK_INFO("Cocal: Allocating saved RNS arrays...")
+        call CCTK_INFO("Allocating saved RNS arrays...")
         write(outstr,'(6i5)') nrg, ntg, npg, nrf, ntf, npf
-        call CCTK_INFO("Cocal Grav grid, Fluid Grid Sizes: "//outstr)
+        call CCTK_INFO("Grav grid, Fluid Grid Sizes: "//outstr)
      end if
 
      ! -- Allocate and initialize saved arrays
@@ -1460,7 +1889,6 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
    DECLARE_CCTK_FUNCTIONS
    DECLARE_CCTK_PARAMETERS
    integer :: i, j, k, imin, imax, jmin, jmax, kmin, kmax
-   integer :: impt, impt_ex, ico, irr, isp, igrid
 
    logical ::  bool_lapse, bool_shift, bool_hydro, bool_Bvec
    
@@ -1468,7 +1896,7 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
    real(8) :: huta, alphfca2  !unique to IR, SP has this + more
    real(8) :: vepxfca, vepyfca, vepzfca      !Unique to IR/SP
    
-   real(8) :: confpow, psifcacp, wxspfca, wyspfca, wzspfca, wdvep, w2, wterm,confpow_p1, confpow_p2 !unique to SP
+   real(8) :: psifcacp, wxspfca, wyspfca, wzspfca, wdvep, w2, wterm !unique to SP
 
    real(long) ::  fr4wxspf(4) , ft4wxspf(4) , fp4wxspf(4) !Unique to SP
    real(long) ::  fr4wyspf(4) , ft4wyspf(4) , fp4wyspf(4) !Unique to SP
@@ -1478,7 +1906,6 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
    real(long) ::  fr4vepyf(4) , ft4vepyf(4) , fp4vepyf(4)
    real(long) ::  fr4vepzf(4) , ft4vepzf(4) , fp4vepzf(4)
    
-   character(30) :: char1
    character(400) :: outstr
    character(len=1) :: np(5) = (/'1', '2','3', '4', '5'/)
    real(8) :: rrcm, xc,yc,zc, xc_p1, yc_p1, zc_p1, xc_p2, yc_p2, zc_p2
@@ -1541,381 +1968,10 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
      z => ccoordz
    endif
    
-   !$OMP critical(coc2cac_bns_read)
    if (.not. have_read_data) then
-      if (verbose == 1) then
-         call CCTK_INFO("Cocal: Reading data...")
-         call CCTK_INFO("Cocal: Reading parameters")
-      end if
-      call CCTK_FortranString(dir_path_len,coc2cac_dir_path_ID,dir_path)  !For reading initial data
-
-      ierr = read_id_type(trim(dir_path)//"/rnspar_mpt1.dat",id_type)
-
-         ! -- Read ID type
-      if (verbose == 1) then
-         call CCTK_INFO("COCAL_ID:: Reading BNS Type")
-         write(outstr,'(a25,a2)') "COCAL_ID:: BNS Type: ", id_type
-         call CCTK_INFO(outstr)
-         call CCTK_INFO(trim(id_type))
-      end if
-
-      !
-      if (ierr.ne.0)     call CCTK_INFO("COCAL_ID:: problem reading file rnspar_mpt1.dat.")
-      if (verbose == 1) then 
-         select case (trim(id_type))
-         case ("CO")
-            call CCTK_INFO("COCAL_ID:: Reading corotating BNS ID")
-         case ("IR")
-            call CCTK_INFO("COCAL_ID:: Reading irrotational BNS ID")
-         case ("SP")
-            call CCTK_INFO("COCAL_ID:: Reading spinning BNS ID")
-         end select
-      end if
-   !
-   ! The coc2cac_ini_sub.F90 subroutine has here option for zero initial shift
-   !
-      gxx1=0.0d0; gxy1=0.0d0; gxz1=0.0d0; gyy1=0.0d0; gyz1=0.0d0; gzz1=0.0d0
-      kxx1=0.0d0; kxy1=0.0d0; kxz1=0.0d0; kyy1=0.0d0; kyz1=0.0d0; kzz1=0.0d0
-      axx=0.0d0; axy=0.0d0; axz=0.0d0; ayy=0.0d0; ayz=0.0d0; azz=0.0d0
-   
-      !TODO remove this
-      !dir_path="/home/astro/mundim/tmp/ET_2014_05_wheeler/Cactus/repos/Cocal/standalone/Cocal/ID_BNS"
-      !dir_path="../../standalone/Cocal/ID_BNS"
-      !dir_path='.'
-      if (verbose == 1) then 
-         call CCTK_INFO("In coc2cac_ir: dir_path="//dir_path)
-      end if 
-      call CCTK_FortranString(coc2cac_readformatlen,coc2cac_readformat,coc2cac_readformatf)
-   
-   !--------------------- Choose gravitational grid -----------------------
-   !igrid3  igrid = 3     ! 3:r_surf is used
-      igrid = 4     ! 4:r_surf=1.0
-   !-----------------------------------------------------------------------
-
-       ! -- Read parameters
-      call allocate_grid_parameter_mpt
-      call allocate_grid_parameter_binary_excision_mpt
-      call allocate_def_matter_parameter_mpt
-      do impt = 1, nmpt
-         if (verbose == 1) then
-            call CCTK_INFO("read_parameter_mpt_cactus")
-         end if
-         call read_parameter_mpt_cactus(impt,dir_path)
-         indata_type = '3D'
-         if (verbose ==1) then
-            call CCTK_INFO("read_surf_parameter_mpt_cactus")
-         end if
-         if (impt .le. 2) call read_surf_parameter_mpt_cactus(impt,dir_path)
-         call copy_grid_parameter_to_mpt(impt)
-         if (verbose == 1) then 
-            call CCTK_INFO("read_parameter_binary_excision_mpt_cactus")
-         end if
-         call read_parameter_binary_excision_mpt_cactus(impt,dir_path)
-         call copy_grid_parameter_binary_excision_to_mpt(impt)
-         if (verbose == 1) then
-            call CCTK_INFO("peos_initialize_mpt_cactus")
-         end if
-         if (impt .le. 2) call peos_initialize_mpt_cactus(impt,dir_path)
-         call copy_def_peos_parameter_to_mpt(impt)
-      end do
-   
-   ! -- Allocate arrays
-      if (verbose == 1) then 
-         call CCTK_INFO("Cocal: Allocating local arrays...")
-      end if
-   
-      call set_allocate_size_mpt
-      call allocate_trig_grav_mphi
-      call allocate_trigonometry_grav_phi_mpt
-   !
-      do impt = 1, nmpt
-         call copy_grid_parameter_from_mpt(impt)
-         call copy_grid_parameter_binary_excision_from_mpt(impt)
-         call copy_def_peos_parameter_from_mpt(impt)
-         call coordinate_patch_kit_grav_grid_coc2cac_mpt(igrid)  ! 3:r_surf is used
-         call calc_parameter_binary_excision
-         call copy_grid_parameter_to_mpt(impt)
-         call copy_grid_parameter_binary_excision_to_mpt(impt)
-         call copy_coordinate_grav_extended_to_mpt(impt)
-         call copy_coordinate_grav_phi_to_mpt(impt)
-         call copy_coordinate_grav_r_to_mpt(impt)
-         call copy_coordinate_grav_theta_to_mpt(impt)
-         call copy_def_binary_parameter_to_mpt(impt)
-         call copy_trigonometry_grav_phi_to_mpt(impt)
-         call copy_trigonometry_grav_theta_to_mpt(impt)
-      end do
-      
-      if (verbose == 1) then
-         call CCTK_INFO("Cocal: Internal reading info (BEGIN):")
-      end if
-      
-      do impt = 1,nmpt
- !=>    call copy_from_mpatch_interpolation_utility(impt)
-         call copy_grid_parameter_from_mpt(impt)
-         call copy_grid_parameter_binary_excision_from_mpt(impt)
-         call copy_coordinate_grav_extended_from_mpt(impt)
-         call copy_coordinate_grav_phi_from_mpt(impt)
-         call copy_coordinate_grav_r_from_mpt(impt)
-         call copy_coordinate_grav_theta_from_mpt(impt)
-         call copy_def_binary_parameter_from_mpt(impt)
-         call copy_trigonometry_grav_phi_from_mpt(impt)
-         call copy_trigonometry_grav_theta_from_mpt(impt)
-      
-      !    write(6,'(6i5)') nrg, ntg, npg, nrf, ntf, npf
-         if (impt==1) then
-            nrg_p1=nrg;  ntg_p1=ntg;  npg_p1=npg;  nrf_p1=nrf;  ntf_p1=ntf;  npf_p1=npf
-            if (verbose == 1) then 
-               call CCTK_INFO("Allocating star1...")
-            end if
-            allocate (       rg_p1( 0:nnrg))
-            allocate (     rgex_p1(-2:nnrg+2))
-            allocate (    thgex_p1(-2:nntg+2))
-            allocate (   phigex_p1(-2:nnpg+2))
-            allocate (  irgex_r_p1(-2:nnrg+2))
-            allocate ( itgex_th_p1(-2:nntg+2))
-            allocate (ipgex_phi_p1(-2:nnpg+2))
-      
-            allocate ( itgex_r_p1(0:nntg,-2:nnrg+2))
-            allocate ( ipgex_r_p1(0:nnpg,-2:nnrg+2))
-            allocate (ipgex_th_p1(0:nnpg,-2:nntg+2))
-      
-            rg_p1=rg;    rgex_p1=rgex;    thgex_p1=thgex;    phigex_p1=phigex
-            irgex_r_p1=irgex_r;  itgex_th_p1=itgex_th;  ipgex_phi_p1=ipgex_phi
-            itgex_r_p1=itgex_r;  ipgex_r_p1=ipgex_r;    ipgex_th_p1=ipgex_th
-      
-            rr3 = 0.7d0*(rgout - rgmid)
-            dis_cm = dis
-            r_surf_p1 = r_surf
-            
-      
-            allocate (  emd_p1(0:nrf,0:ntf,0:npf))
-            select case (trim(id_type))
-               case ("IR","SP")
-                  allocate (  vep_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  allocate (vepxf_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  allocate (vepyf_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  allocate (vepzf_p1(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  vep_p1 =0.0d0;  vepxf_p1=0.0d0;  vepyf_p1=0.0d0;  vepzf_p1=0.0d0 ! Unique to IR/SP, SP has 3 more
-                  select case (trim(id_type))
-                     case ("SP")
-                        allocate (wxspf_p1(0:nrf,0:ntf,0:npf)) ! Unique to SP
-                        allocate (wyspf_p1(0:nrf,0:ntf,0:npf)) ! Unique to SP
-                        allocate (wzspf_p1(0:nrf,0:ntf,0:npf)) ! Unique to SP
-                        wxspf_p1=0.0d0; wyspf_p1=0.0d0; wzspf_p1=0.0d0 ! Unique to SP
-                  end select
-            end select
-            allocate ( psif_p1(0:nrf,0:ntf,0:npf))
-            allocate (alphf_p1(0:nrf,0:ntf,0:npf))
-            allocate (bvxdf_p1(0:nrf,0:ntf,0:npf))
-            allocate (bvydf_p1(0:nrf,0:ntf,0:npf))
-            allocate (bvzdf_p1(0:nrf,0:ntf,0:npf))
-            allocate (   rs_p1(0:ntf,0:npf))
-            allocate (  psi_p1(0:nrg,0:ntg,0:npg))
-            allocate ( alph_p1(0:nrg,0:ntg,0:npg))
-            allocate ( bvxd_p1(0:nrg,0:ntg,0:npg))
-            allocate ( bvyd_p1(0:nrg,0:ntg,0:npg))
-            allocate ( bvzd_p1(0:nrg,0:ntg,0:npg))
-            allocate (  axx_p1(0:nrg,0:ntg,0:npg))
-            allocate (  axy_p1(0:nrg,0:ntg,0:npg))
-            allocate (  axz_p1(0:nrg,0:ntg,0:npg))
-            allocate (  ayy_p1(0:nrg,0:ntg,0:npg))
-            allocate (  ayz_p1(0:nrg,0:ntg,0:npg))
-            allocate (  azz_p1(0:nrg,0:ntg,0:npg))
-            if (verbose == 1) then 
-               call CCTK_INFO("Done allocating star 1...")
-         
-               write(outstr,'(a13,i1,a8)') "Reading COCP-", impt, " data..."
-               call CCTK_INFO(outstr)
-            end if 
-
-            
-            emd_p1=0.0d0;  rs_p1  =0.0d0;  
-            psi_p1=0.0d0;  alph_p1=0.0d0;  bvxd_p1=0.0d0;  bvyd_p1=0.0d0;  bvzd_p1=0.0d0
-            axx_p1=0.0d0;  axy_p1 =0.0d0;  axz_p1 =0.0d0;   ayy_p1=0.0d0;   ayz_p1=0.0d0;   azz_p1=0.0d0
-      
-            call IO_input_CF_grav_export(trim(dir_path)//"/bnsgra_3D_mpt1.las",coc2cac_readformatf,psi_p1,alph_p1,bvxd_p1,bvyd_p1,bvzd_p1)
-            select case (trim(id_type))
-               case("CO")
-                  call IO_input_CF_flco_export(trim(dir_path)//"/bnsflu_3D_mpt1.las",coc2cac_readformatf,emd_p1,ome_p1,ber_p1,radi_p1)
-               case("IR")
-                  call IO_input_CF_flir_export(trim(dir_path)//"/bnsflu_3D_mpt1.las",coc2cac_readformatf,emd_p1,vep_p1,ome_p1,ber_p1,radi_p1) ! This line changes for IR/CO/SP
-               case("SP")
-                  call IO_input_CF_flsp_export(trim(dir_path)//"/bnsflu_3D_mpt1.las",coc2cac_readformatf,emd_p1,vep_p1,wxspf_p1,wyspf_p1,wzspf_p1,ome_p1,ber_p1,radi_p1,confpow_p1)
-            end select
-                  
-      
-            call IO_input_CF_surf_export(trim(dir_path)//"/bnssur_3D_mpt1.las",coc2cac_readformatf,rs_p1)
-      
-      !      call excurve_CF_gridpoint_export(alph_p1,bvxd_p1,bvyd_p1,bvzd_p1, axx_p1, axy_p1, axz_p1, ayy_p1, ayz_p1, azz_p1)
-      
-            call IO_input_grav_export_Kij(trim(dir_path)//"/bnsgra_Kij_3D_mpt1.las", axx_p1, axy_p1, axz_p1, ayy_p1, ayz_p1, azz_p1)
-      
-            call interpo_gr2fl_metric_CF_export(alph_p1, psi_p1, bvxd_p1, bvyd_p1, bvzd_p1, &
-               &    alphf_p1, psif_p1, bvxdf_p1, bvydf_p1, bvzdf_p1, rs_p1)
-      
-      !      call calc_gradvep_export(vep_p1,vepxf_p1,vepyf_p1,vepzf_p1,rs_p1)
-
-            select case (trim(id_type))
-               case ("IR","SP")
-                  call IO_input_gradvep_export(trim(dir_path)//"/bnsdvep_3D_mpt1.las",coc2cac_readformatf,  vepxf_p1, vepyf_p1, vepzf_p1) ! Unique to IR/SP
-            end select
-      
-         end if
-         if (impt==2) then
-            if (verbose == 1) then
-               call CCTK_INFO("Allocating star2...")
-            end if
-            nrg_p2=nrg;  ntg_p2=ntg;  npg_p2=npg;  nrf_p2=nrf;  ntf_p2=ntf;  npf_p2=npf
-            allocate (       rg_p2( 0:nnrg))
-            allocate (     rgex_p2(-2:nnrg+2))
-            allocate (    thgex_p2(-2:nntg+2))
-            allocate (   phigex_p2(-2:nnpg+2))
-            allocate (  irgex_r_p2(-2:nnrg+2))
-            allocate ( itgex_th_p2(-2:nntg+2))
-            allocate (ipgex_phi_p2(-2:nnpg+2))
-      
-            allocate ( itgex_r_p2(0:nntg,-2:nnrg+2))
-            allocate ( ipgex_r_p2(0:nnpg,-2:nnrg+2))
-            allocate (ipgex_th_p2(0:nnpg,-2:nntg+2))
-      
-            rg_p2=rg;    rgex_p2=rgex;    thgex_p2=thgex;    phigex_p2=phigex
-            irgex_r_p2=irgex_r;  itgex_th_p2=itgex_th;  ipgex_phi_p2=ipgex_phi
-            itgex_r_p2=itgex_r;  ipgex_r_p2=ipgex_r;    ipgex_th_p2=ipgex_th
-      
-            r_surf_p2 = r_surf
-            
-      
-            allocate (  emd_p2(0:nrf,0:ntf,0:npf))
-            select case (trim(id_type))
-               case ("IR","SP")
-                  allocate (  vep_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  allocate (vepxf_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  allocate (vepyf_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  allocate (vepzf_p2(0:nrf,0:ntf,0:npf)) ! Unique to IR/SP, SP has 3 more
-                  vep_p2 =0.0d0;  vepxf_p2=0.0d0;  vepyf_p2=0.0d0;  vepzf_p2=0.0d0 ! Unique to IR/SP, SP has 3 more
-                  select case (trim(id_type))
-                     case ("SP")
-                        allocate (wxspf_p2(0:nrf,0:ntf,0:npf)) ! Unique to SP
-                        allocate (wyspf_p2(0:nrf,0:ntf,0:npf)) ! Unique to SP
-                        allocate (wzspf_p2(0:nrf,0:ntf,0:npf)) ! Unique to SP
-                        wxspf_p2=0.0d0; wyspf_p2=0.0d0; wzspf_p2=0.0d0 ! Unique to SP
-                  end select
-            end select
-            allocate ( psif_p2(0:nrf,0:ntf,0:npf))
-            allocate (alphf_p2(0:nrf,0:ntf,0:npf))
-            allocate (bvxdf_p2(0:nrf,0:ntf,0:npf))
-            allocate (bvydf_p2(0:nrf,0:ntf,0:npf))
-            allocate (bvzdf_p2(0:nrf,0:ntf,0:npf))
-            allocate (   rs_p2(0:ntf,0:npf))
-            allocate (  psi_p2(0:nrg,0:ntg,0:npg))
-            allocate ( alph_p2(0:nrg,0:ntg,0:npg))
-            allocate ( bvxd_p2(0:nrg,0:ntg,0:npg))
-            allocate ( bvyd_p2(0:nrg,0:ntg,0:npg))
-            allocate ( bvzd_p2(0:nrg,0:ntg,0:npg))
-            allocate (  axx_p2(0:nrg,0:ntg,0:npg))
-            allocate (  axy_p2(0:nrg,0:ntg,0:npg))
-            allocate (  axz_p2(0:nrg,0:ntg,0:npg))
-            allocate (  ayy_p2(0:nrg,0:ntg,0:npg))
-            allocate (  ayz_p2(0:nrg,0:ntg,0:npg))
-            allocate (  azz_p2(0:nrg,0:ntg,0:npg))
-            if (verbose == 1) then 
-               call CCTK_INFO("Done allocating star 2...")
-               write(outstr,'(a13,i1,a8)') "Reading COCP-", impt, " data..."
-               call CCTK_INFO(outstr)
-            end if
-
-            emd_p2=0.0d0;  rs_p2=0.0d0
-            psi_p2=0.0d0;  alph_p2=0.0d0;  bvxd_p2=0.0d0;   bvyd_p2=0.0d0;  bvzd_p2=0.0d0
-            axx_p2=0.0d0;   axy_p2=0.0d0;   axz_p2=0.0d0;    ayy_p2=0.0d0;   ayz_p2=0.0d0;   azz_p2=0.0d0
-      
-            call IO_input_CF_grav_export(trim(dir_path)//"/bnsgra_3D_mpt2.las",coc2cac_readformatf,psi_p2,alph_p2,bvxd_p2,bvyd_p2,bvzd_p2)
-      
-            select case (trim(id_type))
-            case("CO")
-               call IO_input_CF_flco_export(trim(dir_path)//"/bnsflu_3D_mpt2.las",coc2cac_readformatf,emd_p2,ome_p2,ber_p2,radi_p2)
-            case("IR")
-               call IO_input_CF_flir_export(trim(dir_path)//"/bnsflu_3D_mpt2.las",coc2cac_readformatf,emd_p2,vep_p2,ome_p2,ber_p2,radi_p2) ! This line changes for IR/CO/SP
-            case("SP")
-               call IO_input_CF_flsp_export(trim(dir_path)//"/bnsflu_3D_mpt2.las",coc2cac_readformatf,emd_p2,vep_p2,wxspf_p2,wyspf_p2,wzspf_p2,ome_p2,ber_p2,radi_p2,confpow_p2)
-            end select
-      
-            call IO_input_CF_surf_export(trim(dir_path)//"/bnssur_3D_mpt2.las",coc2cac_readformatf,rs_p2)
-      
-      !      call excurve_CF_gridpoint_export(alph_p2,bvxd_p2,bvyd_p2,bvzd_p2,  axx_p2, axy_p2, axz_p2, ayy_p2, ayz_p2, azz_p2)
-      
-            call IO_input_grav_export_Kij(trim(dir_path)//"/bnsgra_Kij_3D_mpt2.las", axx_p2, axy_p2, axz_p2, ayy_p2, ayz_p2, azz_p2)
-      
-            call interpo_gr2fl_metric_CF_export(alph_p2, psi_p2, bvxd_p2, bvyd_p2, bvzd_p2, &
-               &    alphf_p2, psif_p2, bvxdf_p2, bvydf_p2, bvzdf_p2, rs_p2)
-      
-      !      call calc_gradvep_export(vep_p2,vepxf_p2,vepyf_p2,vepzf_p2,rs_p2)
-      
-            select case (trim(id_type))
-               case ("IR","SP")
-                  call IO_input_gradvep_export(trim(dir_path)//"/bnsdvep_3D_mpt2.las",coc2cac_readformatf,  vepxf_p2, vepyf_p2, vepzf_p2) ! Unique to IR/SP
-                  vepxf_p2 = - vepxf_p2 ! Unique to IR/SP
-                  vepyf_p2 = - vepyf_p2 ! Unique to IR/SP
-                  select case (trim(id_type))
-                     case ("SP")
-                        wxspf_p2 = - wxspf_p2 !unique to SP
-                        wyspf_p2 = - wyspf_p2 !unique to SP
-                  end select
-            end select
-            bvxdf_p2 = - bvxdf_p2
-            bvydf_p2 = - bvydf_p2
-            bvxd_p2  = - bvxd_p2
-            bvyd_p2  = - bvyd_p2
-            axz_p2   = - axz_p2
-            ayz_p2   = - ayz_p2
-         end if
-         if (impt==3) then
-            nrg_p3=nrg;  ntg_p3=ntg;  npg_p3=npg;  nrf_p3=nrf;  ntf_p3=ntf;  npf_p3=npf
-            allocate (       rg_p3( 0:nnrg))
-            allocate (     rgex_p3(-2:nnrg+2))
-            allocate (    thgex_p3(-2:nntg+2))
-            allocate (   phigex_p3(-2:nnpg+2))
-            allocate (  irgex_r_p3(-2:nnrg+2))
-            allocate ( itgex_th_p3(-2:nntg+2))
-            allocate (ipgex_phi_p3(-2:nnpg+2))
-      
-            allocate ( itgex_r_p3(0:nntg,-2:nnrg+2))
-            allocate ( ipgex_r_p3(0:nnpg,-2:nnrg+2))
-            allocate (ipgex_th_p3(0:nnpg,-2:nntg+2))
-      
-            rg_p3=rg;    rgex_p3=rgex;    thgex_p3=thgex;    phigex_p3=phigex
-            irgex_r_p3=irgex_r;  itgex_th_p3=itgex_th;  ipgex_phi_p3=ipgex_phi
-            itgex_r_p3=itgex_r;  ipgex_r_p3=ipgex_r;    ipgex_th_p3=ipgex_th
-            if (verbose == 1) then
-               write(outstr,'(a13,i1,a8)') "Reading ARCP-", impt, " data..."
-               call CCTK_INFO(outstr)
-            end if
-
-            allocate ( psi_p3(0:nrg,0:ntg,0:npg))
-            allocate (alph_p3(0:nrg,0:ntg,0:npg))
-            allocate (bvxd_p3(0:nrg,0:ntg,0:npg))
-            allocate (bvyd_p3(0:nrg,0:ntg,0:npg))
-            allocate (bvzd_p3(0:nrg,0:ntg,0:npg))
-            allocate ( axx_p3(0:nrg,0:ntg,0:npg))
-            allocate ( axy_p3(0:nrg,0:ntg,0:npg))
-            allocate ( axz_p3(0:nrg,0:ntg,0:npg))
-            allocate ( ayy_p3(0:nrg,0:ntg,0:npg))
-            allocate ( ayz_p3(0:nrg,0:ntg,0:npg))
-            allocate ( azz_p3(0:nrg,0:ntg,0:npg))
-            psi_p3=0.0d0;  alph_p3=0.0d0;  bvxd_p3=0.0d0;  bvyd_p3=0.0d0; bvzd_p3=0.0d0
-            axx_p3=0.0d0;   axy_p3=0.0d0;   axz_p3=0.0d0;   ayy_p3=0.0d0;  ayz_p3=0.0d0; azz_p3=0.0d0
-      
-            call IO_input_CF_grav_export(trim(dir_path)//"/bnsgra_3D_mpt3.las",coc2cac_readformatf,psi_p3,alph_p3,bvxd_p3,bvyd_p3,bvzd_p3)
-            
-            call IO_input_grav_export_Kij(trim(dir_path)//"/bnsgra_Kij_3D_mpt3.las", axx_p3, axy_p3, axz_p3, ayy_p3, ayz_p3, azz_p3)
-      
-      !      call excurve_CF_gridpoint_export(alph_p3,bvxd_p3,bvyd_p3,bvzd_p3, axx_p3, axy_p3, axz_p3, ayy_p3, ayz_p3, azz_p3)
-      
-         end if
-      end do
-      have_read_data = .true.
-      call CCTK_INFO("Cocal: Done reading data.")
+      call CCTK_ERROR("COCAL_IDX::coc2cac_bns called before coc2cac_read_bns_data completed. Refusing fallback per-level read.")
    end if
-   !$OMP END critical(coc2cac_bns_read)
+
    if (verbose == 1) then
       write(outstr,'(2e20.12)') emd_p1(0,0,0), emd_p1(58,0,0)
       call CCTK_INFO("First and Last emd_p1:"//outstr)
@@ -1924,8 +1980,8 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
       write(outstr,'(e20.12)') dis_cm
       call CCTK_INFO("Distance between stars: "//outstr)
  !
-      call CCTK_INFO("Cocal: Internal reading info (END).")
-      call CCTK_INFO("Cocal: Looping over local cartesian grid:")
+      call CCTK_INFO("Internal reading info (END).")
+      call CCTK_INFO("Looping over local cartesian grid:")
    end if
  
    imin = max(1, 1 + cctk_tile_min(1))
@@ -2751,19 +2807,4 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
       call CCTK_INFO("Finishing COCAL bns reader")
    end if
 end do
- !
-   contains
-   integer function read_id_type(filename,id_type)
-     implicit none
-     integer :: nrg, nrf, nrf_deform, nrgin
-     character(len=*) :: filename
-     character(2) :: id_type, EQ_point
-   
-     open(unit = 1,file = trim(filename), status='old')
-     read(1,'(4i5)') nrg
-     read(1,'(4i5)') nrf
-     read(1,'(2i5,2(3x,a2))') nrf_deform, nrgin, id_type, EQ_point
-     close(1)
-     read_id_type = 0
-   end function read_id_type
  END SUBROUTINE coc2cac_bns
