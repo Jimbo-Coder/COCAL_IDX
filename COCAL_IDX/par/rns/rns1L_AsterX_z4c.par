@@ -1,6 +1,6 @@
 # AsterX BNS IG parfile
 
-$itlast = 128000
+$itlast = 4
 $final_time = 1000
 $xmin = -256 #-512.0
 $xmax = 256 #+512.0
@@ -8,7 +8,8 @@ $ncells = 64
 $nlevels = 5
 $error_threshold = 0.9
 $dtfac = 0.25
-$out_every = 64
+$out_every = 1
+$out_every3d = 64
 
 ActiveThorns = "
 ADMBaseX
@@ -39,8 +40,8 @@ QuasiLocalMeasures
 
 Cactus::cctk_show_schedule = yes
 Cactus::presync_mode = "mixed-error"
-Cactus::terminate = "never"
-Cactus::cctk_itlast = $itlast
+Cactus::terminate = "iteration"
+Cactus::cctk_itlast = 4
 Cactus::cctk_final_time = $final_time
 #Cactus::max_runtime = 30   # minutes
 #Cactus::max_runtime = 23*60+30   # minutes
@@ -71,7 +72,7 @@ CarpetX::max_tile_size_z = 1024000
 
 CarpetX::max_grid_size_x = 64
 CarpetX::max_grid_size_y = 64
-CarpetX::max_grid_size_z = 128
+CarpetX::max_grid_size_z = 64
 
 #CarpetX::max_grid_sizes_x = [  64,   64,   64 ]
 #CarpetX::max_grid_sizes_y = [  32,   32,   32 ]
@@ -89,16 +90,16 @@ CarpetX::ghost_size = 3
 CarpetX::max_num_levels = 6
 CarpetX::regrid_every = 1280000
 CarpetX::regrid_error_threshold = $error_threshold
-CarpetX::out_performance_every = 1024
+CarpetX::out_performance_every = $out_every
 
 CarpetX::refine_grid_layout = no
 #CarpetX::gpu_sync_after_every_kernel = yes
 #Initial data
 #RNS WL 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24 radius about 13
 #RNS CF 1L /anvil/projects/x-mca99s008/coc2cac_IDs/rns/rnsH3_K123.6_CF_M1.4_par_sol_24
-cocal_IDX::coc2cac_dir_path_ID = "/projects/bgmi/mrizzo/COCAL_IDs/rns/rnsH3_K123.6_WL_M1.4_par_sol_24"
+cocal_IDX::coc2cac_dir_path_ID = "/Users/mrizzo/phys_research/COCAL_IDs/rns/rnsH3_K123.6_CF_M1.4_par_sol_24"
 cocal_IDX::coc2cac_readpot = "False"
-cocal_IDX::coc2cac_rnstype         = "RNS_WL"
+cocal_IDX::coc2cac_rnstype         = "RNS_CF"
 
 cocal_IDX::coc2cac_cen_x1 =  0.0
 
@@ -109,6 +110,8 @@ cocal_IDX::verbose = "True"
 #Subcycling
 CarpetX::use_subcycling_wip = yes
 CarpetX::restrict_during_sync = no
+AsterX::timelevels = 2
+Z4c::timelevels = 2
 
 # -------------------- BoxInBox -------------------------------------------------
 BoxInBox::num_regions = 1
@@ -204,7 +207,7 @@ EOSX::eps_max = 1e8
 EOSX::eps_min = 1.236e-09 
 
 IO::out_dir = $parfile
-IO::out_every = $out_every #
+IO::out_every = $out_every3d #
 CarpetX::out_norm_vars = "all"
 CarpetX::out_norm_omit_unstable = yes
 CarpetX::out_norm_every = $out_every
@@ -238,39 +241,38 @@ CarpetX::out_openpmd_vars = "
     #Z4c::allC
     Z4c::HC
     Z4c::MtC
-#    VolumeIntegrals_vacuumX::MADM_GFtest
 "
 
-CarpetX::out_tsv_every = $out_every
+CarpetX::out_tsv_every = $out_every3d
 CarpetX::out_tsv_vars = "
-#    AsterX::dB
+    AsterX::dB
      HydroBaseX::rho
      HydroBaseX::vel
      HydroBaseX::eps
      HydroBaseX::Bvec
-     HydroBaseX::press
-     ADMBaseX::lapse
-     ADMBaseX::shift
-     ADMBaseX::metric
-     ADMBaseX::curv
+    HydroBaseX::press
+    ADMBaseX::lapse
+    ADMBaseX::shift
+    ADMBaseX::metric
+    ADMBaseX::curv
 #    #TmunuBaseX::eTtt
 #    #TmunuBaseX::eTti
 #    #TmunuBaseX::eTij
 #    #Z4c::allC
 #    Z4c::HC
 #    Z4c::MtC
-     SphericalSurface::sf_info
-     SphericalSurface::sf_origin
-     SphericalSurface::sf_valid
-     SphericalSurface::sf_radius
-     QuasiLocalMeasures::qlm_grid_real
-     QuasiLocalMeasures::qlm_scalars
-#  VolumeIntegrals_vacuumX::MADM_GFtest
+    SphericalSurface::sf_info
+    SphericalSurface::sf_origin
+    SphericalSurface::sf_valid
+    SphericalSurface::sf_radius
+    QuasiLocalMeasures::qlm_grid_real
+    QuasiLocalMeasures::qlm_scalars
 "
 
-CarpetX::out_metadata = no
+CarpetX::out_metadata = yes
+CarpetX::out_openpmd_every = $out_every3d
 
-TimerReport::out_every = 16384 #$out_every
+TimerReport::out_every = $out_every
 TimerReport::out_filename = "TimerReport"
 TimerReport::output_all_timers_together = yes
 TimerReport::output_all_timers_readable = yes
@@ -278,12 +280,12 @@ TimerReport::n_top_timers = 100
 
 
 # RUN SCALING TEST
-IO::checkpoint_dir = "../checkpoint"
-IO::recover_dir    = "../checkpoint"
+IO::checkpoint_dir = "checkpoints"
+IO::recover_dir    = "checkpoints"
 IO::checkpoint_ID = no
 IO::checkpoint_every = 128000
 IO::checkpoint_every_walltime_hours = 0.9
-IO::checkpoint_on_terminate = yes
+IO::checkpoint_on_terminate = no
 IO::recover                 = "autoprobe"
 
 CarpetX::checkpoint_method = "openpmd"
@@ -291,7 +293,7 @@ CarpetX::recover_method    = "openpmd"
 
 
 # Set number of integrals
-VolumeIntegrals_GRMHDX::NumIntegrals = 3
+VolumeIntegrals_GRMHDX::NumIntegrals = 1
 # Set frequency of integration. If tracking AMR centres this should
 # match the regridding frequency of the thorn CactusRegrid2
 VolumeIntegrals_GRMHDX::VolIntegral_out_every = $out_every
@@ -302,12 +304,12 @@ VolumeIntegrals_GRMHDX::outVolIntegral_dir = "volume_integration"
 # Set verbose level. 0 disables it, 1 provides useful
 # information, and 2 is very verbose.
 VolumeIntegrals_GRMHDX::verbose = 2
-VolumeIntegrals_GRMHDX::set_origin_with_VIX = "yes"
+VolumeIntegrals_GRMHDX::set_origin_with_VIX = "no"
 
 # The AMR centre will only track the first referenced
 # integration quantities that track said centre.
 # Integral #1: rest mass
-VolumeIntegrals_GRMHDX::Integration_quantity_keyword[1] = "centerofmass"
+VolumeIntegrals_GRMHDX::Integration_quantity_keyword[1] = "one"
 VolumeIntegrals_GRMHDX::Integration_quantity_keyword[2] = "restmass"
 VolumeIntegrals_GRMHDX::Integration_quantity_keyword[3] = "one"
 #
@@ -322,8 +324,8 @@ VolumeIntegrals_vacuumX::enable_file_output    = 1
 
 VolumeIntegrals_vacuumX::outVolIntegral_dir    = "volume_integration"
 VolumeIntegrals_vacuumX::VolIntegral_out_every = $out_every
-VolumeIntegrals_vacuumX::NumIntegrals          = 7
-VolumeIntegrals_vacuumX::Integration_quantity_keyword[1] = "H_M_CnstraintsL2"
+VolumeIntegrals_vacuumX::NumIntegrals          = 1
+VolumeIntegrals_vacuumX::Integration_quantity_keyword[1] = "one"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[2] = "H_M2_CnstraintsL2"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[3] = "ADM_Mass"
 VolumeIntegrals_vacuumX::Integration_quantity_keyword[4] = "ADM_Mass"
@@ -336,48 +338,30 @@ VolumeIntegrals_vacuumX::volintegral_inside_sphere__radius[4] = 0.95*$xmax
 
 
 SphericalSurface::nsurfaces = 5
-SphericalSurface::name[0] = "r = 5.0"
-SphericalSurface::name[1] = "r = 15.0"
-SphericalSurface::name[2] = "r = 100.0"
-SphericalSurface::name[3] = "r = 150.0"
-SphericalSurface::name[4] = "r = 250.0"
+SphericalSurface::verbose = yes
+SphericalSurface::name[0] = "r = 0.5 xmax"
+SphericalSurface::name[1] = "r = 0.6 xmax"
+SphericalSurface::name[2] = "r = 0.7 xmax"
+SphericalSurface::name[3] = "r = 0.8 xmax"
+SphericalSurface::name[4] = "r = 0.9 xmax"
 
 SphericalSurface::maxntheta = 19
 SphericalSurface::maxnphi = 40
 
-SphericalSurface::ntheta[0] = 19
-SphericalSurface::ntheta[1] = 19
-SphericalSurface::ntheta[2] = 19
-SphericalSurface::ntheta[3] = 19
-SphericalSurface::ntheta[4] = 19
+SphericalSurface::auto_res = [ "no", "no", "no", "no", "no" ]
+SphericalSurface::ntheta = [ 19, 19, 19, 19, 19 ]
+SphericalSurface::nphi = [ 40, 40, 40, 40, 40 ]
 
-SphericalSurface::nphi[0] = 40
-SphericalSurface::nphi[1] = 40
-SphericalSurface::nphi[2] = 40
-SphericalSurface::nphi[3] = 40
-SphericalSurface::nphi[4] = 40
+SphericalSurface::set_spherical = [ "yes", "yes", "yes", "yes", "yes" ]
+SphericalSurface::radius = [ 0.5*$xmax, 0.6*$xmax, 0.7*$xmax, 0.8*$xmax, 0.9*$xmax ]
 
-SphericalSurface::set_spherical[0] = "yes"
-SphericalSurface::set_spherical[1] = "yes"
-SphericalSurface::set_spherical[2] = "yes"
-SphericalSurface::set_spherical[3] = "yes"
-SphericalSurface::set_spherical[4] = "yes"
-
-SphericalSurface::radius[0] = 5.0
-SphericalSurface::radius[1] = 15.0
-SphericalSurface::radius[2] = 100.0
-SphericalSurface::radius[3] = 150.0
-SphericalSurface::radius[4] = 250.0
-
-QuasiLocalMeasures::veryverbose = yes
 QuasiLocalMeasures::verbose = yes
+QuasiLocalMeasures::veryverbose = yes
 QuasiLocalMeasures::num_surfaces = SphericalSurface::nsurfaces
 QuasiLocalMeasures::surface_index = [ 0, 1, 2, 3, 4 ]
-QuasiLocalMeasures::surface_name = [ "r = 5.0", "r = 15.0", "r = 100.0", "r = 150.0", "r = 250.0" ]
+QuasiLocalMeasures::surface_name = [ "r = 0.5 xmax", "r = 0.6 xmax", "r = 0.7 xmax", "r = 0.8 xmax", "r = 0.9 xmax" ]
 #
 #Outflow::compute_every = $out_every
 #Outflow::num_detectors = SphericalSurface::nsurfaces
 #Outflow::surface_index = [ 0, 1, 2, 3, 4 ]
 #Outflow::surface_name = [ "r = 5.0", "r = 15.0", "r = 50.0", "r = 250.0", "r = 500.0" ]
-
-
