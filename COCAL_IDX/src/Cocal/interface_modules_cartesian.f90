@@ -20,6 +20,28 @@ module interface_modules_cartesian
       real(8), intent(out) :: cfn
       real(8) ::  xc, yc, zc
     end subroutine interpo_gr2cgr_4th
+
+    subroutine gr2cgr_4th_setup(xc,yc,zc,irgex4,itgex4,ipgex4,wr,wth,wphi)
+      real(8), intent(in)  :: xc, yc, zc
+      integer, intent(out) :: irgex4(4,4,4), itgex4(4,4,4), ipgex4(4,4,4)
+      real(8), intent(out) :: wr(4), wth(4), wphi(4)
+    end subroutine gr2cgr_4th_setup
+
+    subroutine fl2cgr_4th_setup(xc,yc,zc,rs,outside,irgex4,itgex4,ipgex4,wr,wth,wphi)
+      real(8), intent(in)  :: xc, yc, zc
+      real(8), pointer     :: rs(:,:)
+      logical, intent(out) :: outside
+      integer, intent(out) :: irgex4(4,4,4), itgex4(4,4,4), ipgex4(4,4,4)
+      real(8), intent(out) :: wr(4), wth(4), wphi(4)
+    end subroutine fl2cgr_4th_setup
+
+    subroutine cgr_4th_apply(fnc,cfn,irgex4,itgex4,ipgex4,wr,wth,wphi)
+      real(8), pointer     :: fnc(:,:,:)
+      real(8), intent(out) :: cfn
+      integer, intent(in)  :: irgex4(4,4,4), itgex4(4,4,4), ipgex4(4,4,4)
+      real(8), intent(in)  :: wr(4), wth(4), wphi(4)
+    end subroutine cgr_4th_apply
+
     subroutine interpolation_matter(fnc,fncca)
       real(8), pointer :: fnc(:,:,:)
       real(8), pointer :: fncca(:,:,:)

@@ -101,8 +101,6 @@ cocal_IDX::coc2cac_dir_path_ID = "/Users/mrizzo/phys_research/COCAL_IDs/rns/rnsH
 cocal_IDX::coc2cac_readpot = "False"
 cocal_IDX::coc2cac_rnstype         = "RNS_CF"
 
-cocal_IDX::coc2cac_cen_x1 =  0.0
-
 cocal_IDX::coc2cac_readformat = "20.12"
 
 cocal_IDX::verbose = "True"
@@ -161,7 +159,7 @@ AsterSeeds::Ab = 0.0
 AsterSeeds::press_cut = 0.04
 AsterSeeds::press_max =  7.7855755426457722e-05
 AsterSeeds::Avec_kappa = 2.0
-AsterSeeds::dipole_x = [cocal_IDX::coc2cac_cen_x1]
+AsterSeeds::dipole_x = [0.0]
 
 
 AsterX::debug_mode = "no"

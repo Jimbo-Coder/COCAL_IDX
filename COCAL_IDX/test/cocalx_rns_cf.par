@@ -1,0 +1,85 @@
+# COCAL_IDX reduced-fixture reader regression test.
+
+Cactus::cctk_run_title = "COCAL_IDX RNS CF fixture"
+Cactus::cctk_full_warnings = "yes"
+Cactus::highlight_warning_messages = "no"
+Cactus::terminate = "iteration"
+Cactus::cctk_itlast = 0
+Cactus::presync_mode = "mixed-error"
+Cactus::cctk_show_schedule = "no"
+
+ActiveThorns = "
+  ADMBaseX
+  CarpetX
+  CoordinatesX
+  HydroBaseX
+  IOUtil
+  COCAL_IDX
+"
+
+CarpetX::verbose = no
+CarpetX::poison_undefined_values = yes
+CarpetX::poison_undefined_arrays = no
+
+CarpetX::xmin = -1.0
+CarpetX::xmax =  1.0
+CarpetX::ymin = -1.0
+CarpetX::ymax =  1.0
+CarpetX::zmin = -1.0
+CarpetX::zmax =  1.0
+
+CarpetX::ncells_x = 4
+CarpetX::ncells_y = 4
+CarpetX::ncells_z = 4
+
+CarpetX::blocking_factor_x = 1
+CarpetX::blocking_factor_y = 1
+CarpetX::blocking_factor_z = 1
+CarpetX::max_grid_size_x = 4
+CarpetX::max_grid_size_y = 4
+CarpetX::max_grid_size_z = 4
+CarpetX::max_tile_size_x = 1024000
+CarpetX::max_tile_size_y = 1024000
+CarpetX::max_tile_size_z = 1024000
+
+CarpetX::boundary_x = "neumann"
+CarpetX::boundary_y = "neumann"
+CarpetX::boundary_z = "neumann"
+CarpetX::boundary_upper_x = "neumann"
+CarpetX::boundary_upper_y = "neumann"
+CarpetX::boundary_upper_z = "neumann"
+CarpetX::ghost_size = 3
+CarpetX::max_num_levels = 1
+CarpetX::regrid_every = 1280000
+CarpetX::dtfac = 0.5
+
+COCAL_IDX::coc2cac_dir_path_ID = "../../../arrangements/COCALX/COCAL_IDX/test/test_InitialData/rns_cf"
+COCAL_IDX::coc2cac_rnstype = "RNS_CF"
+COCAL_IDX::coc2cac_readpot = "False"
+COCAL_IDX::coc2cac_readformat = "20.12"
+COCAL_IDX::verbose = "False"
+
+ADMBaseX::initial_data = "CocalRNS"
+ADMBaseX::initial_lapse = "Cocal"
+ADMBaseX::initial_shift = "Cocal"
+ADMBaseX::initial_dtlapse = "zero"
+ADMBaseX::initial_dtshift = "zero"
+HydroBaseX::initial_hydro = "Cocal"
+
+IO::out_dir = $parfile
+IO::out_every = 1
+IO::out_fileinfo = "none"
+IO::parfile_write = "no"
+
+CarpetX::out_metadata = no
+CarpetX::out_norm_vars = "
+  ADMBaseX::lapse
+  ADMBaseX::shift
+  ADMBaseX::metric
+  ADMBaseX::curv
+  HydroBaseX::rho
+  HydroBaseX::press
+  HydroBaseX::vel
+"
+CarpetX::out_norm_omit_unstable = yes
+CarpetX::out_norm_omit_sumloc_for_backward_compatibility = yes

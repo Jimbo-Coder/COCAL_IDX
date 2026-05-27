@@ -26,11 +26,6 @@ EXTENDS keyword initial_hydro
   "Cocal" :: "Cocal provides the initial_hydro"
 }
 
-#EXTENDS keyword initial_Bvec
-#{
-#  "Cocal" :: "Cocal provides the initial_bvec"
-#}
-#
 #EXTENDS keyword initial_temperature
 #{
 #  "Cocal" :: "Cocal provides the inital_temperature"
@@ -53,15 +48,7 @@ CCTK_KEYWORD coc2cac_rnstype "Type of initial data, currently"
   "RNS_WL" :: "Waveless"
   "RNS_CF" :: "Conformally Flat"
   "MRNS_WL" :: "Magnetized Waveless"
-  "BHT_WL" :: "Waveless BH with Disk"
 } "RNS_CF"
-
-CCTK_KEYWORD coc2cac_bnstype "Type of initial data, currently"
-{
-  "BNS_WL" :: "Waveless BNS"
-  "BNS_CF" :: "CF BNS"
-  "MBNS_WL" :: "Magnetized Waveless BNS"
-} "BNS_CF"
 
 CCTK_KEYWORD coc2cac_readformat "Format of the input data"
 {
@@ -76,54 +63,34 @@ CCTK_BOOLEAN verbose "Whether to print on ranks beyond 0."
 
 CCTK_BOOLEAN coc2cac_readpot "Whether to read the Potential or faraday tensor, True for Potential, False for Fields."
 {
-} "False"
+} "True"
 
-CCTK_INT coc2cac_Nstars "Number of Single Neutron Stars to put on Grid"
-{
-  1:30 :: ""
-} 1
-
-CCTK_REAL coc2cac_cen_x1 "X Position of centre 1"
+CCTK_REAL coc2cac_cen_x1 "X Position of BNS star 1 for grid centers and diagnostics"
 {
   *:* :: ""
 } 0.0
 
-CCTK_REAL coc2cac_cen_y1 "Y Position of centre 1"
+CCTK_REAL coc2cac_cen_y1 "Y Position of BNS star 1 for grid centers and diagnostics"
 {
   *:* :: ""
 } 0.0
 
-CCTK_REAL coc2cac_cen_z1 "Z Position of centre 1"
+CCTK_REAL coc2cac_cen_z1 "Z Position of BNS star 1 for grid centers and diagnostics"
 {
   *:* :: ""
 } 0.0
 
-CCTK_REAL coc2cac_cen_x2 "X Position of centre 2"
+CCTK_REAL coc2cac_cen_x2 "X Position of BNS star 2 for grid centers and diagnostics"
 {
   *:* :: ""
 } 0.0
 
-CCTK_REAL coc2cac_cen_y2 "Y Position of centre 2"
+CCTK_REAL coc2cac_cen_y2 "Y Position of BNS star 2 for grid centers and diagnostics"
 {
   *:* :: ""
 } 0.0
 
-CCTK_REAL coc2cac_cen_z2 "Z Position of centre 2"
-{
-  *:* :: ""
-} 0.0
-
-CCTK_REAL coc2cac_cen_x3 "X Position of centre 2"
-{
-  *:* :: ""
-} 0.0
-
-CCTK_REAL coc2cac_cen_y3 "Y Position of centre 2"
-{
-  *:* :: ""
-} 0.0
-
-CCTK_REAL coc2cac_cen_z3 "Z Position of centre 2"
+CCTK_REAL coc2cac_cen_z2 "Z Position of BNS star 2 for grid centers and diagnostics"
 {
   *:* :: ""
 } 0.0
