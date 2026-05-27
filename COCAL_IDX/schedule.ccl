@@ -24,6 +24,7 @@ if (CCTK_Equals(initial_data, "CocalRNS") || (CCTK_Equals(initial_data, "CocalBN
       WRITES: HydroBaseX::rho(everywhere) HydroBaseX::press(everywhere) HydroBaseX::eps(everywhere) HydroBaseX::vel(everywhere)
       WRITES: HydroBaseX::Bvec(everywhere) HydroBaseX::Avecx(everywhere) HydroBaseX::Avecy(everywhere) HydroBaseX::Avecz(everywhere)
       WRITES: ADMBaseX::metric(everywhere) ADMBaseX::curv(everywhere) ADMBaseX::lapse(everywhere) ADMBaseX::shift(everywhere)
+      WRITES: AsterX::Avec_x(everywhere) AsterX::Avec_y(everywhere) AsterX::Avec_z(everywhere) AsterX::Psi(everywhere)
    }"Read Cocal Initial Data into Cactus"
    if (CCTK_Equals(initial_data, "CocalRNS"))
       SCHEDULE coc2cac_deallocate_rns AT CPINITIAL

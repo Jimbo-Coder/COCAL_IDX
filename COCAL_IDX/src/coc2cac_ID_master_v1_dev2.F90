@@ -143,7 +143,7 @@ module cocal_data_rns
   real(8), pointer, save :: utf(:,:,:) => NULL() ,  uxf(:,:,:) => NULL() ,  uyf(:,:,:) => NULL() ,  uzf(:,:,:) => NULL()
 !
   real(8), pointer, save :: emd(:,:,:) => NULL(), omef(:,:,:) => NULL(), rs(:,:) => NULL()
-  real(8), pointer, save :: psi(:,:,:) => NULL() , alph(:,:,:) => NULL()
+  real(8), pointer, save :: cocal_psi(:,:,:) => NULL() , alph(:,:,:) => NULL()
   real(8), pointer, save :: psif(:,:,:) => NULL() , alphf(:,:,:) => NULL()
   real(8), pointer, save :: bvxuf(:,:,:) => NULL() , bvyuf(:,:,:) => NULL() , bvzuf(:,:,:) => NULL() 
   real(8), pointer, save :: bvxd(:,:,:) => NULL() , bvyd(:,:,:) => NULL() , bvzd(:,:,:) => NULL()
@@ -214,7 +214,7 @@ module cocal_data_bns
 
 subroutine coc2cac_read_bns_data(CCTK_ARGUMENTS)
   use grid_parameter_binary_excision
-  use phys_constant
+  use phys_constant, g_cocal => g
   use grid_parameter, eps_cocal => eps
   use coordinate_grav_r
   use coordinate_grav_extended
@@ -718,12 +718,12 @@ subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
      bvxu=0.0d0; bvyu=0.0d0; bvzu=0.0d0
      hxxu=0.0d0; hxyu=0.0d0; hxzu=0.0d0; hyyu=0.0d0; hyzu=0.0d0; hzzu=0.0d0
 
-     allocate (  psi(0:nrg,0:ntg,0:npg))
+     allocate (  cocal_psi(0:nrg,0:ntg,0:npg))
      allocate ( alph(0:nrg,0:ntg,0:npg))
      allocate ( bvxd(0:nrg,0:ntg,0:npg))
      allocate ( bvyd(0:nrg,0:ntg,0:npg))
      allocate ( bvzd(0:nrg,0:ntg,0:npg))
-     psi=0.0d0; alph=0.0d0; bvxd=0.0d0; bvyd=0.0d0; bvzd=0.0d0
+     cocal_psi=0.0d0; alph=0.0d0; bvxd=0.0d0; bvyd=0.0d0; bvzd=0.0d0
 
      allocate (rs(0:ntf,0:npf))
      allocate (emd(0:nrf,0:ntf,0:npf))
@@ -771,7 +771,7 @@ subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
      end if
 
      ! -- Read COCAL data files
-     call IO_input_CF_grav_export(trim(dir_path)//"/rnsgra_3D.las",coc2cac_readformatf,psi,alph,bvxd,bvyd,bvzd)
+     call IO_input_CF_grav_export(trim(dir_path)//"/rnsgra_3D.las",coc2cac_readformatf,cocal_psi,alph,bvxd,bvyd,bvzd)
      call IO_input_CF_star_export(trim(dir_path)//"/rnsflu_3D.las",coc2cac_readformatf,emd,rs,omef,ome,ber,radi)
      call IO_input_grav_export_Kij(trim(dir_path)//"/rnsgra_Kij_3D.las",kxxa,kxya,kxza,kyya,kyza,kzza)
 
@@ -797,7 +797,7 @@ subroutine coc2cac_read_rns_data(CCTK_ARGUMENTS)
      ! -- Internal auxiliary-grid construction used by the interpolation phase
      call invhij_WL_export(hxxd,hxyd,hxzd,hyyd,hyzd,hzzd,hxxu,hxyu,hxzu,hyyu,hyzu,hzzu)
      call index_vec_down2up_export(hxxu,hxyu,hxzu,hyyu,hyzu,hzzu,bvxu,bvyu,bvzu,bvxd,bvyd,bvzd)
-     call interpo_gr2fl_metric_CF_export(alph, psi, bvxu, bvyu, bvzu, alphf, psif, bvxuf, bvyuf, bvzuf, rs)
+     call interpo_gr2fl_metric_CF_export(alph, cocal_psi, bvxu, bvyu, bvzu, alphf, psif, bvxuf, bvyuf, bvzuf, rs)
 
      have_read_data = .true.
      if (verbose == 1) then
@@ -819,9 +819,10 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
         kxx, kxy, kxz, kyy, kyz, kzz, &
         rho, eps, press, velx, vely, velz, &
         Bvecx, Bvecy, Bvecz, Avecx, Avecy, Avecz, &
+        Ax_Avecx, Ax_Avecy, Ax_Avecz, Ax_Psi, &
         vcoordx, vcoordy , vcoordz, ccoordx, ccoordy , ccoordz)
 
-    use phys_constant
+    use phys_constant, g_cocal => g
     use grid_parameter, eps_cocal => eps
     use interface_modules_cartesian
     use coordinate_grav_r
@@ -866,6 +867,15 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
     CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
         Avecz
 
+    CCTK_REAL, dimension(cctk_ash(1)-1, cctk_ash(2), cctk_ash(3)) :: &
+        Ax_Avecx
+    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2)-1, cctk_ash(3)) :: &
+        Ax_Avecy
+    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
+        Ax_Avecz
+    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)) :: &
+        Ax_Psi
+
     CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)), target :: &
         vcoordx, vcoordy, vcoordz
 
@@ -879,10 +889,11 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
         kxx, kxy, kxz, kyy, kyz, kzz, &
         rho, eps, press, velx, vely, velz, &
         Bvecx, Bvecy, Bvecz, Avecx, Avecy, Avecz, &
+        Ax_Avecx, Ax_Avecy, Ax_Avecz, Ax_Psi, &
         vcoordx, vcoordy , vcoordz, ccoordx, ccoordy , ccoordz)
       
        use grid_parameter_binary_excision
-       use phys_constant
+       use phys_constant, g_cocal => g
        use grid_parameter, eps_cocal => eps
        use coordinate_grav_r
        use coordinate_grav_extended
@@ -924,6 +935,15 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
     CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
         Avecz
 
+    CCTK_REAL, dimension(cctk_ash(1)-1, cctk_ash(2), cctk_ash(3)) :: &
+        Ax_Avecx
+    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2)-1, cctk_ash(3)) :: &
+        Ax_Avecy
+    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
+        Ax_Avecz
+    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)) :: &
+        Ax_Psi
+
     CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)), target :: &
         vcoordx, vcoordy, vcoordz
 
@@ -942,6 +962,7 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
       kxx, kxy, kxz, kyy, kyz, kzz, &
       rho, eps, press, velx, vely, velz, &
       Bvecx, Bvecy, Bvecz, Avecx, Avecy, Avecz, &
+      Avec_x, Avec_y, Avec_z, Psi, &
       vcoordx, vcoordy , vcoordz, ccoordx, ccoordy , ccoordz)
   else if (CCTK_EQUALS(initial_data, "CocalBNS")) then
     call CCTK_INFO("Executing Main Cocal BNS Reader")
@@ -952,6 +973,7 @@ subroutine coc2cac_main(CCTK_ARGUMENTS)
       kxx, kxy, kxz, kyy, kyz, kzz, &
       rho, eps, press, velx, vely, velz, &
       Bvecx, Bvecy, Bvecz, Avecx, Avecy, Avecz, &
+      Avec_x, Avec_y, Avec_z, Psi, &
       vcoordx, vcoordy , vcoordz, ccoordx, ccoordy , ccoordz)
   end if
 end subroutine coc2cac_main
@@ -988,7 +1010,7 @@ subroutine coc2cac_deallocate_rns(CCTK_ARGUMENTS)
      end if
    !
      deallocate(emd, omef, rs)
-     deallocate(psi  , alph)
+     deallocate(cocal_psi  , alph)
      deallocate(psif, alphf)
      deallocate(bvxuf, bvyuf, bvzuf)
      deallocate(bvxd , bvyd , bvzd)
@@ -1080,9 +1102,10 @@ end subroutine
       kxx, kxy, kxz, kyy, kyz, kzz, &
       rho, eps, press, velx, vely, velz, &
       Bvecx, Bvecy, Bvecz, Avecx, Avecy, Avecz, &
+      Ax_Avecx, Ax_Avecy, Ax_Avecz, Ax_Psi, &
       vcoordx, vcoordy , vcoordz, ccoordx, ccoordy , ccoordz)
 
-  use phys_constant
+  use phys_constant, g_cocal => g
   use grid_parameter, eps_cocal => eps
   use interface_modules_cartesian
   use coordinate_grav_r
@@ -1127,6 +1150,15 @@ end subroutine
   CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
       Avecz
 
+  CCTK_REAL, dimension(cctk_ash(1)-1, cctk_ash(2), cctk_ash(3)) :: &
+      Ax_Avecx
+  CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2)-1, cctk_ash(3)) :: &
+      Ax_Avecy
+  CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
+      Ax_Avecz
+  CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)) :: &
+      Ax_Psi
+
   CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)), target :: &
       vcoordx, vcoordy, vcoordz
 
@@ -1157,6 +1189,7 @@ end subroutine
   real(8) :: vxu, vyu, vzu
   real(8) :: bxcor, bycor, bzcor, bvxufca, bvyufca, bvzufca, psifca, alphfca
   real(8) :: gxx1, gxy1, gxz1, gyy1, gyz1, gzz1, kxx1, kxy1, kxz1, kyy1, kyz1, kzz1
+  real(8) :: detg1
 
   real(8) :: va1, vaxd1, vayd1, vazd1, fxd1, fyd1, fzd1, fxyd1, fxzd1, fyzd1!
   real(8) :: vaca, vaxdca, vaydca, vazdca, fxdca, fydca, fzdca, fxydca, fxzdca, fyzdca!
@@ -1226,11 +1259,9 @@ end subroutine
   else
      bool_shift = .false.
   end if
-  if (CCTK_EQUALS(initial_hydro, "Cocal")) then
-     bool_Bvec = .true.
-  else
-     bool_Bvec = .false.
-  end if
+  ! HydroBaseX does not provide separate initial_Bvec/Avec/Aphi controls.
+  ! On this branch, magnetic variables are provided exactly for MRNS_WL data only.
+  bool_Bvec = CCTK_EQUALS(coc2cac_rnstype, "MRNS_WL")
 
       call CCTK_FortranString(dir_path_len,coc2cac_dir_path_ID,dir_path)  !For reading initial data
 
@@ -1266,7 +1297,7 @@ end subroutine
 
                call gr2cgr_4th_setup(xcoc,ycoc,zcoc, &
                   gr_irgex4,gr_itgex4,gr_ipgex4,gr_wr,gr_wth,gr_wphi)
-               call cgr_4th_apply(psi , psica , gr_irgex4, gr_itgex4, gr_ipgex4, gr_wr, gr_wth, gr_wphi)
+               call cgr_4th_apply(cocal_psi , psica , gr_irgex4, gr_itgex4, gr_ipgex4, gr_wr, gr_wth, gr_wphi)
                call cgr_4th_apply(alph, alphca, gr_irgex4, gr_itgex4, gr_ipgex4, gr_wr, gr_wth, gr_wphi)
 
                call cgr_4th_apply(bvxd, bvxdca, gr_irgex4, gr_itgex4, gr_ipgex4, gr_wr, gr_wth, gr_wphi)
@@ -1379,14 +1410,43 @@ end subroutine
                   Bvecy(i,j,k) = 0.0d0
                   Bvecz(i,j,k) = 0.0d0
                end if
+               if (cent .eq. 1) then
+                  if (bool_Bvec .and. coc2cac_readpot == 1 .and. &
+                     coc2cac_set_asterx_avec == 1) then
+                     detg1 = gxx1*(gyy1*gzz1 - gyz1*gyz1) &
+                        - gxy1*(gxy1*gzz1 - gyz1*gxz1) &
+                        + gxz1*(gxy1*gyz1 - gyy1*gxz1)
+                     Ax_Psi(i,j,k) = sqrt(detg1)*vaca
+                  else
+                     Ax_Psi(i,j,k) = 0.0d0
+                  end if
+               end if
                if (cent .eq. 3) then
                   Avecx(i,j,k) = 0.0d0
+                  if (bool_Bvec .and. coc2cac_readpot == 1 .and. &
+                     coc2cac_set_asterx_avec == 1) then
+                     Ax_Avecx(i,j,k) = vaxdca
+                  else
+                     Ax_Avecx(i,j,k) = 0.0d0
+                  end if
                end if
                if (cent .eq. 4) then
                   Avecy(i,j,k) = 0.0d0
+                  if (bool_Bvec .and. coc2cac_readpot == 1 .and. &
+                     coc2cac_set_asterx_avec == 1) then
+                     Ax_Avecy(i,j,k) = vaydca
+                  else
+                     Ax_Avecy(i,j,k) = 0.0d0
+                  end if
                end if
                if (cent .eq. 5) then
                   Avecz(i,j,k) = 0.0d0
+                  if (bool_Bvec .and. coc2cac_readpot == 1 .and. &
+                     coc2cac_set_asterx_avec == 1) then
+                     Ax_Avecz(i,j,k) = vazdca
+                  else
+                     Ax_Avecz(i,j,k) = 0.0d0
+                  end if
                end if
                if (bool_Bvec) then
                   if (CCTK_EQUALS(coc2cac_rnstype, "MRNS_WL")) then
@@ -1519,7 +1579,7 @@ end subroutine
       ! deallocate(bvxuf);  deallocate(bvyuf);  deallocate(bvzuf);
       ! deallocate( bvxu);  deallocate( bvyu);  deallocate( bvzu);
       ! deallocate(   rs);
-      ! deallocate(  psi);  deallocate( alph);
+      ! deallocate(cocal_psi);  deallocate( alph);
       ! deallocate( bvxd);  deallocate( bvyd);deallocate( bvzd);  
       ! deallocate( hxxd);  deallocate( hxyd);  deallocate( hxzd);  deallocate( hyyd);
       ! deallocate( hyzd);  deallocate( hzzd);
@@ -1568,10 +1628,11 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
       kxx, kxy, kxz, kyy, kyz, kzz, &
       rho, eps, press, velx, vely, velz, &
       Bvecx, Bvecy, Bvecz, Avecx, Avecy, Avecz, &
+      Ax_Avecx, Ax_Avecy, Ax_Avecz, Ax_Psi, &
       vcoordx, vcoordy , vcoordz, ccoordx, ccoordy , ccoordz)
  !
    use grid_parameter_binary_excision
-   use phys_constant
+   use phys_constant, g_cocal => g
    use grid_parameter, eps_cocal => eps
    use coordinate_grav_r
    use coordinate_grav_extended
@@ -1616,6 +1677,15 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
        Avecz
  
+   CCTK_REAL, dimension(cctk_ash(1)-1, cctk_ash(2), cctk_ash(3)) :: &
+       Ax_Avecx
+   CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2)-1, cctk_ash(3)) :: &
+       Ax_Avecy
+   CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)-1) :: &
+       Ax_Avecz
+   CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)) :: &
+       Ax_Psi
+
    CCTK_REAL, dimension(cctk_ash(1), cctk_ash(2), cctk_ash(3)), target :: &
        vcoordx, vcoordy, vcoordz
  
@@ -2457,14 +2527,20 @@ SUBROUTINE coc2cac_bns(cctk_lsh, cctk_ash, cctk_tile_min, cctk_tile_max, &
             Bvecy(i,j,k) = 0.0d0
             Bvecz(i,j,k) = 0.0d0
          end if
+         if(cent.eq.1) then
+            Ax_Psi(i,j,k) = 0.0d0
+         end if
          if(cent.eq.3) then
             Avecx(i,j,k) = 0.0d0
+            Ax_Avecx(i,j,k) = 0.0d0
          end if
          if(cent.eq.4) then
             Avecy(i,j,k) = 0.0d0
+            Ax_Avecy(i,j,k) = 0.0d0
          end if
          if(cent.eq.5) then
             Avecz(i,j,k) = 0.0d0
+            Ax_Avecz(i,j,k) = 0.0d0
          end if
        !   write(6,'(a6,e20.12)') "psi  =", psica
        !   write(6,'(a6,e20.12)') "alph =", alphca
